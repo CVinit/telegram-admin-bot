@@ -17,6 +17,7 @@
 - 人工处理单个订单发货
 - 人工批量发货
 - 所有写操作先预览再确认
+- 人工发货后返回顾客通知预期回执
 - 本地操作审计与防重复执行
 - Docker 独立部署
 
@@ -235,6 +236,7 @@ Bot 只做“前置隐藏 + 前置校验”，最终仍以 Admin API 返回结�
 5. 生成预览
 6. 管理员确认
 7. 执行发货
+8. 返回通知预期回执
 
 #### APIs
 
@@ -257,6 +259,17 @@ Bot 支持两种录入模式：
 - note
 
 最终提交时转换为主项目现有发货结构。
+
+#### Result Receipt
+
+单个发货成功后，Bot 返回：
+
+- 发货是否成功
+- 目标订单号
+- 发货内容摘要
+- 邮件通知预期状态
+- Telegram 通知预期状态
+- 若为跳过或未知，则显示原因
 
 ### 7.4 Batch Manual Fulfillment
 
@@ -283,6 +296,7 @@ Bot 支持两种录入模式：
 6. 管理员确认
 7. Bot 串行逐单执行
 8. 汇总成功 / 失败结果
+9. 汇总每单通知预期状态
 
 #### Execution Rule
 
@@ -292,6 +306,83 @@ Bot 支持两种录入模式：
 - 中途失败不回滚已成功订单
 
 这是最符合现有 Admin API 能力和可审计性的做法。
+
+### 7.5 Customer Notification Hint
+
+#### Purpose
+
+管理员在 Bot 内人工发货后，除了看到“发货成功”，还需要知道系统后续是否预期会通知顾客。
+
+#### Output Contract
+
+Bot 对每次人工发货返回两类通知提示：
+
+- `email`
+- `telegram`
+
+每类提示使用以下状态之一：
+
+- `expected_attempt`
+- `expected_skip`
+- `unknown`
+
+#### Important Boundary
+
+这里的结果是“预期提示”，不是“最终送达证明”。
+
+原因：
+
+- 当前 `POST /api/v1/admin/fulfillments` 不返回邮件任务或 Bot 通知任务的入队结果
+- 邮件通知和 Telegram 通知都是异步链路
+- 即使任务已入队，后续仍可能因为 worker、SMTP、回调地址或独立 Bot 服务故障而未真正送达
+
+因此，在“不修改主项目代码”的前提下，管理 Bot 只能输出合理的执行预期，不能声称“顾客已收到”。
+
+#### Email Hint Rules
+
+Bot 通过以下信息生成邮件通知预期：
+
+- 订单详情中的接收邮箱
+- 管理端 SMTP 设置是否启用
+- 收件邮箱是否为空
+- 收件邮箱是否为 Telegram 占位邮箱
+
+规则：
+
+- SMTP 未启用 -> `expected_skip`
+- 接收邮箱为空 -> `expected_skip`
+- 接收邮箱为 Telegram 占位邮箱 -> `expected_skip`
+- 以上条件都通过 -> `expected_attempt`
+- 无法确定必要信息 -> `unknown`
+
+#### Telegram Hint Rules
+
+Bot 通过以下信息生成 Telegram 通知预期：
+
+- 订单所属用户是否存在 Telegram OAuth 身份
+- 是否存在激活的 `telegram_bot` 渠道客户端
+- 渠道客户端是否配置 `callback_url`
+- Telegram Bot 运行状态是否可用
+
+规则：
+
+- 订单无用户或用户未绑定 Telegram -> `expected_skip`
+- 无激活的 `telegram_bot` 渠道客户端 -> `expected_skip`
+- 渠道客户端缺少 `callback_url` -> `expected_skip`
+- Telegram Bot 运行状态明确异常 -> `unknown`
+- 以上条件都通过 -> `expected_attempt`
+
+#### UX Requirement
+
+Bot 在回执中必须展示简短原因，例如：
+
+- `邮件：预期尝试，SMTP 已启用，收件邮箱有效`
+- `Telegram：预期跳过，用户未绑定 Telegram`
+- `Telegram：状态未知，运行时状态不可用`
+
+#### Future Upgrade Path
+
+如果后续允许修改主项目，可以新增显式回执或通知日志接口，让 Bot 从“预期提示”升级为“实际入队结果”甚至“最终发送结果”。
 
 ## 8. Preview And Idempotency
 
@@ -391,6 +482,7 @@ Bot 使用独立 SQLite，不接管 Dujiao-Next 主库。
 
 - `GET /api/v1/admin/orders`
 - `GET /api/v1/admin/orders/:id`
+- `GET /api/v1/admin/users/:id`
 
 ### 10.4 Fulfillment
 
@@ -402,6 +494,12 @@ Bot 使用独立 SQLite，不接管 Dujiao-Next 主库。
 - `GET /api/v1/admin/products/:id`
 - `POST /api/v1/admin/card-secrets/batch`
 - `GET /api/v1/admin/card-secrets/stats`
+
+### 10.6 Settings And Bot Runtime
+
+- `GET /api/v1/admin/settings/smtp`
+- `GET /api/v1/admin/settings/telegram-bot/runtime-status`
+- `GET /api/v1/admin/channel-clients`
 
 ## 11. Proposed Folder Layout
 
@@ -475,6 +573,7 @@ telegram-admin-bot/
 - 单个订单人工发货
 - 批量发货
 - 预览确认机制
+- 发货后通知预期回执
 - 本地审计
 - Docker 部署文件
 
@@ -510,6 +609,16 @@ telegram-admin-bot/
 ### 15.4 Duplicate Restock
 
 补库存本质是追加型写入，必须依赖确认 token 和本地审计防止重复导入。
+
+### 15.5 Notification Truthfulness
+
+在不修改主项目的前提下，Bot 只能基于可见条件判断“预期会尝试通知”还是“预期跳过 / 状态未知”。
+
+它不能证明：
+
+- 邮件任务一定已成功入队
+- SMTP 一定已真正发送
+- Telegram 独立 Bot 一定已把消息发给顾客
 
 ## 16. Recommendation
 
