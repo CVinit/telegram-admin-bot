@@ -8,7 +8,7 @@ COPY internal ./internal
 
 RUN CGO_ENABLED=0 go build -o /out/telegram-admin-bot ./cmd/bot
 
-FROM gcr.io/distroless/static-debian12
+FROM gcr.io/distroless/base-debian12
 
 WORKDIR /app
 

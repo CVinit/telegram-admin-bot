@@ -38,6 +38,7 @@ docker run --rm --env-file .env -v "$(pwd)/data:/app/data" telegram-admin-bot
 Use the compose stub:
 
 ```bash
+mkdir -p data
 docker compose -f docker-compose.example.yml up --build
 ```
 
