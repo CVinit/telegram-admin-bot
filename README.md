@@ -13,6 +13,7 @@ cp .env.example .env
 ## Run Locally
 
 ```bash
+mkdir -p data
 set -a
 source .env
 set +a
@@ -30,7 +31,8 @@ docker build -t telegram-admin-bot .
 Run the container with env file:
 
 ```bash
-docker run --rm --env-file .env telegram-admin-bot
+mkdir -p data
+docker run --rm --env-file .env -v "$(pwd)/data:/app/data" telegram-admin-bot
 ```
 
 Use the compose stub:
@@ -38,3 +40,6 @@ Use the compose stub:
 ```bash
 docker compose -f docker-compose.example.yml up --build
 ```
+
+The example SQLite path writes to `./data/bot.db`, so the data directory must exist
+and be mounted into `/app/data` when running in Docker.

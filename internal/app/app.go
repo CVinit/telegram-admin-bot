@@ -3,7 +3,7 @@ package app
 import (
 	"context"
 
-	"github.com/dujiao-next/telegram-admin-bot/internal/config"
+	"github.com/dujiao-next/dujiao-next/telegram-admin-bot/internal/config"
 )
 
 type App struct {
