@@ -1,16 +1,55 @@
 # Telegram Admin Bot
 
-This module contains the standalone Telegram admin bot service for Dujiao Next.
+`telegram-admin-bot/` is a standalone administrator-side Telegram bot for Dujiao Next.
+It runs as a sidecar service, stores its own SQLite state, and talks to the existing
+Dujiao Admin API over `localhost` or the local Docker network.
+
+## Scope
+
+Current implementation covers:
+
+- admin login, logout, and session lookup
+- daily, weekly, and monthly sales overview
+- auto-fulfillment restock preview and confirmation
+- single and batch manual fulfillment preview and confirmation
+- customer notification hint computation for email and Telegram
+
+Important boundary:
+
+- notification hints are not delivery proof
+- the bot can only infer whether Dujiao Next should attempt email or Telegram notification
+- the bot cannot prove asynchronous worker success or customer receipt
+
+## Prerequisites
+
+Before enabling bot-based admin login, disable the Dujiao admin login captcha for the
+target site. The bot uses the normal admin login API and cannot solve captchas.
+
+Required Dujiao-side services:
+
+- API service
+- queue worker, if you expect downstream email tasks or Telegram callback tasks to run
+- SMTP, if you expect order-status email attempts
+- an active Telegram channel client with callback URL, if you expect customer Telegram attempts
 
 ## Environment
 
-Copy and edit the example environment file:
+Copy the example file and edit it:
 
 ```bash
 cp .env.example .env
 ```
 
-## Run Locally
+Main variables:
+
+- `TELEGRAM_BOT_TOKEN`: bot token from BotFather
+- `DUJIAO_BASE_URL`: Dujiao Admin API base, for example `http://127.0.0.1:8080/api/v1`
+- `SQLITE_PATH`: bot-local SQLite database path
+- `ACTION_CONFIRM_TTL_SECONDS`: preview-confirm expiry window
+- `SESSION_EXPIRE_SKEW_SECONDS`: reserved session skew knob
+- `LOG_LEVEL`: current runtime log level
+
+## Local Run
 
 ```bash
 mkdir -p data
@@ -20,27 +59,89 @@ set +a
 go run ./cmd/bot
 ```
 
-## Run With Docker
-
-Build the image:
+Run the local smoke checks:
 
 ```bash
-docker build -t telegram-admin-bot .
+./scripts/smoke_local.sh
 ```
 
-Run the container with env file:
+## Docker Build
+
+```bash
+docker build -t telegram-admin-bot:local .
+```
+
+Run with an env file and a persistent SQLite directory:
 
 ```bash
 mkdir -p data
-docker run --rm --env-file .env -v "$(pwd)/data:/app/data" telegram-admin-bot
+docker run --rm \
+  --env-file .env \
+  -v "$(pwd)/data:/app/data" \
+  telegram-admin-bot:local
 ```
 
-Use the compose stub:
+## Docker Compose
+
+If both containers run in the same Compose project, prefer the service name instead of
+host `localhost`:
+
+```yaml
+environment:
+  DUJIAO_BASE_URL: http://api:8080/api/v1
+```
+
+Bring the stack up:
 
 ```bash
 mkdir -p data
 docker compose -f docker-compose.example.yml up --build
 ```
 
-The example SQLite path writes to `./data/bot.db`, so the data directory must exist
-and be mounted into `/app/data` when running in Docker.
+The sample compose file shows:
+
+- `api` service for Dujiao Next API
+- `worker` service for async tasks
+- `telegram-admin-bot` sidecar service
+- a shared local network where the bot reaches the API by service name
+
+If you deploy the bot directly on the host instead of inside Docker, keep:
+
+```env
+DUJIAO_BASE_URL=http://127.0.0.1:8080/api/v1
+```
+
+## Commands
+
+Current command set:
+
+- `/login <username> <password>`
+- `/logout`
+- `/session`
+- `/help`
+- `/sales today|week|month`
+- `/restock <product_id> [sku_id]` followed by pasted secrets on the next lines
+- `/ship <order_no>` followed by fulfillment content on the next lines
+- `/batch_ship status=<status> [product=<keyword>] [from=<date>] [to=<date>] [limit=<n>]` followed by fulfillment content on the next lines
+
+Current upload support:
+
+- `csv` and `txt` documents for `/restock`
+- put the `/restock <product_id> [sku_id]` command in the document caption
+
+Confirmation model:
+
+- write operations create a preview first
+- execution happens only after clicking the inline confirm button
+- consumed or expired confirmations are rejected
+
+## Verification
+
+Recommended verification sequence:
+
+```bash
+go test ./...
+go test -race ./...
+go build ./cmd/bot
+docker build -t telegram-admin-bot:local .
+```

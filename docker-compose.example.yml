@@ -4,6 +4,12 @@ services:
     ports:
       - "8080:8080"
 
+  worker:
+    image: ghcr.io/dujiao-next/api:latest
+    command: ["./dujiao-next", "worker"]
+    depends_on:
+      - api
+
   telegram-admin-bot:
     build:
       context: .
@@ -12,7 +18,9 @@ services:
       - .env
     environment:
       DUJIAO_BASE_URL: http://api:8080/api/v1
+      SQLITE_PATH: /app/data/bot.db
     volumes:
       - ./data:/app/data
     depends_on:
       - api
+      - worker
