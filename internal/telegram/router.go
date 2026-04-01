@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/dujiao-next/dujiao-next/telegram-admin-bot/internal/session"
+	"github.com/dujiao-next/dujiao-next/telegram-admin-bot/internal/workflow"
 )
 
 type sessionService interface {
@@ -17,6 +18,7 @@ type sessionService interface {
 type Router struct {
 	sessions sessionService
 	sales    salesWorkflow
+	restock  restockWorkflow
 }
 
 func NewRouter(sessions sessionService) *Router {
@@ -55,7 +57,7 @@ func (r *Router) Handle(ctx context.Context, update IncomingUpdate) (*Response, 
 	case "/sales":
 		return r.handleSales(ctx, update, args)
 	case "/restock":
-		return r.handlePlaceholder(ctx, update, "补自动库存")
+		return r.handleRestock(ctx, update, args)
 	case "/ship":
 		return r.handlePlaceholder(ctx, update, "单个发货")
 	case "/batch_ship":
@@ -70,6 +72,9 @@ func (r *Router) handleCallback(ctx context.Context, update IncomingUpdate) (*Re
 	case CallbackMenuHome:
 		return r.handleMenuHome(ctx, update)
 	default:
+		if strings.HasPrefix(strings.TrimSpace(update.CallbackData), workflow.RestockConfirmPrefix) {
+			return r.handleRestockConfirm(ctx, update)
+		}
 		return &Response{
 			Text:         "未识别的菜单操作。",
 			CallbackID:   update.CallbackID,
@@ -79,7 +84,15 @@ func (r *Router) handleCallback(ctx context.Context, update IncomingUpdate) (*Re
 }
 
 func parseCommand(text string) (string, []string) {
-	fields := strings.Fields(strings.TrimSpace(text))
+	text = strings.TrimSpace(text)
+	if text == "" {
+		return "", nil
+	}
+	header := text
+	if idx := strings.IndexByte(text, '\n'); idx >= 0 {
+		header = text[:idx]
+	}
+	fields := strings.Fields(header)
 	if len(fields) == 0 {
 		return "", nil
 	}

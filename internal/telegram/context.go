@@ -20,8 +20,9 @@ const (
 type KeyboardKind string
 
 const (
-	KeyboardKindNone  KeyboardKind = ""
-	KeyboardKindReply KeyboardKind = "reply"
+	KeyboardKindNone   KeyboardKind = ""
+	KeyboardKindReply  KeyboardKind = "reply"
+	KeyboardKindInline KeyboardKind = "inline"
 )
 
 type IncomingUpdate struct {
@@ -29,6 +30,8 @@ type IncomingUpdate struct {
 	ChatID       int64
 	ChatType     ChatType
 	Text         string
+	DocumentName string
+	DocumentData []byte
 	CallbackID   string
 	CallbackData string
 }

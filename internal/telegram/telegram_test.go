@@ -140,6 +140,82 @@ func TestSalesCommandRoutesRequestedRange(t *testing.T) {
 	}
 }
 
+func TestRestockCommandBuildsPreviewWithConfirmButton(t *testing.T) {
+	restock := &stubRestockWorkflow{
+		preview: &workflow.RestockPreviewView{
+			ActionKey:   "restock_confirm:123:1",
+			ProductID:   9,
+			ProductName: "会员卡",
+			SecretCount: 2,
+			BatchNo:     "batch-1",
+			Source:      "text",
+		},
+	}
+
+	router := NewRouter(&stubSessionService{
+		requireView: &session.SessionView{
+			TelegramUser: 123456789,
+			AdminID:      3,
+			Username:     "ops",
+			JWTToken:     "jwt-demo",
+		},
+	}).WithRestockWorkflow(restock)
+
+	result, err := router.Handle(context.Background(), IncomingUpdate{
+		TelegramUser: 123456789,
+		ChatID:       123456789,
+		ChatType:     ChatTypePrivate,
+		Text:         "/restock 9\nA\nB\n",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if restock.lastTextProductID != 9 {
+		t.Fatalf("expected product 9, got %#v", restock)
+	}
+	if result.KeyboardKind != KeyboardKindInline || len(result.Keyboard) == 0 || result.Keyboard[0][0].CallbackData == "" {
+		t.Fatalf("expected inline confirm button, got %#v", result)
+	}
+}
+
+func TestRestockConfirmCallbackExecutesWorkflow(t *testing.T) {
+	restock := &stubRestockWorkflow{
+		result: &workflow.RestockResultView{
+			ProductID:   9,
+			ProductName: "会员卡",
+			Created:     2,
+			BatchNo:     "batch-1",
+			SecretCount: 2,
+		},
+	}
+
+	router := NewRouter(&stubSessionService{
+		requireView: &session.SessionView{
+			TelegramUser: 123456789,
+			AdminID:      3,
+			Username:     "ops",
+			JWTToken:     "jwt-demo",
+		},
+	}).WithRestockWorkflow(restock)
+
+	result, err := router.Handle(context.Background(), IncomingUpdate{
+		TelegramUser: 123456789,
+		ChatID:       123456789,
+		ChatType:     ChatTypePrivate,
+		CallbackID:   "cb-1",
+		CallbackData: "restock_confirm:123:1",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if restock.lastConfirmAction != "restock_confirm:123:1" {
+		t.Fatalf("expected confirm action key, got %#v", restock)
+	}
+	if !strings.Contains(result.Text, "补库存已完成") {
+		t.Fatalf("unexpected confirm response: %#v", result)
+	}
+}
+
 type stubSessionService struct {
 	loginView   *session.SessionView
 	loginErr    error
@@ -181,4 +257,36 @@ type stubSalesWorkflow struct {
 func (s *stubSalesWorkflow) BuildOverview(_ context.Context, _ *session.SessionView, rangeKey string) (*workflow.SalesOverviewView, error) {
 	s.lastRange = rangeKey
 	return s.response, s.err
+}
+
+type stubRestockWorkflow struct {
+	lastTextProductID uint
+	lastTextSKUID     uint
+	lastTextBody      string
+	lastFileName      string
+	lastFileContent   []byte
+	lastConfirmAction string
+	preview           *workflow.RestockPreviewView
+	result            *workflow.RestockResultView
+	err               error
+}
+
+func (s *stubRestockWorkflow) BuildPreviewFromText(_ context.Context, _ *session.SessionView, productID, skuID uint, rawText string) (*workflow.RestockPreviewView, error) {
+	s.lastTextProductID = productID
+	s.lastTextSKUID = skuID
+	s.lastTextBody = rawText
+	return s.preview, s.err
+}
+
+func (s *stubRestockWorkflow) BuildPreviewFromFile(_ context.Context, _ *session.SessionView, productID, skuID uint, fileName string, content []byte) (*workflow.RestockPreviewView, error) {
+	s.lastTextProductID = productID
+	s.lastTextSKUID = skuID
+	s.lastFileName = fileName
+	s.lastFileContent = content
+	return s.preview, s.err
+}
+
+func (s *stubRestockWorkflow) Confirm(_ context.Context, _ *session.SessionView, actionKey string) (*workflow.RestockResultView, error) {
+	s.lastConfirmAction = actionKey
+	return s.result, s.err
 }

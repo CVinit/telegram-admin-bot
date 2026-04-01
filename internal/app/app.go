@@ -5,7 +5,9 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"time"
 
+	"github.com/dujiao-next/dujiao-next/telegram-admin-bot/internal/audit"
 	"github.com/dujiao-next/dujiao-next/telegram-admin-bot/internal/config"
 	"github.com/dujiao-next/dujiao-next/telegram-admin-bot/internal/dujiao"
 	"github.com/dujiao-next/dujiao-next/telegram-admin-bot/internal/session"
@@ -34,9 +36,16 @@ func New(cfg config.Config) (*App, error) {
 
 	apiClient := dujiao.New(cfg.DujiaoBaseURL)
 	sessionStore := storage.NewSessionStore(db)
+	pendingStore := storage.NewPendingActionStore(db)
+	actionLogStore := storage.NewActionLogStore(db)
 	sessionService := session.NewService(apiClient, sessionStore)
+	auditService := audit.NewService(actionLogStore)
+	confirmationService := workflow.NewConfirmationService(pendingStore, time.Duration(cfg.ActionConfirmTTLSeconds)*time.Second)
 	salesWorkflow := workflow.NewSalesWorkflow(apiClient)
-	router := telegram.NewRouter(sessionService).WithSalesWorkflow(salesWorkflow)
+	restockWorkflow := workflow.NewRestockWorkflow(apiClient, confirmationService, auditService)
+	router := telegram.NewRouter(sessionService).
+		WithSalesWorkflow(salesWorkflow).
+		WithRestockWorkflow(restockWorkflow)
 	runtime, err := telegram.NewRuntime(cfg.BotToken, router)
 	if err != nil {
 		return nil, fmt.Errorf("create telegram runtime: %w", err)
