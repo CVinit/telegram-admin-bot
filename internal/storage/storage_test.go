@@ -31,6 +31,7 @@ func TestSessionStoreRoundTrip(t *testing.T) {
 	created := &AdminSession{
 		TelegramUser: 1001,
 		AdminID:      42,
+		IsSuper:      true,
 		Username:     "alice",
 		JWTToken:     "token-1",
 		JWTExpiresAt: time.Now().UTC().Add(30 * time.Minute),
@@ -54,9 +55,13 @@ func TestSessionStoreRoundTrip(t *testing.T) {
 	if got.Username != "alice" || got.JWTToken != "token-1" {
 		t.Fatalf("unexpected session values: %+v", got)
 	}
+	if !got.IsSuper {
+		t.Fatalf("expected IsSuper round-trip, got %+v", got)
+	}
 
 	created.JWTToken = "token-2"
 	created.Username = "alice-updated"
+	created.IsSuper = false
 	created.RolesJSON = `["owner","operator"]`
 	if err := store.UpsertSession(ctx, created); err != nil {
 		t.Fatal(err)
@@ -71,6 +76,9 @@ func TestSessionStoreRoundTrip(t *testing.T) {
 	}
 	if got.Username != "alice-updated" || got.JWTToken != "token-2" {
 		t.Fatalf("session was not updated: %+v", got)
+	}
+	if got.IsSuper {
+		t.Fatalf("expected IsSuper update to persist, got %+v", got)
 	}
 
 	if err := store.DeleteSessionByTelegramUser(ctx, created.TelegramUser); err != nil {

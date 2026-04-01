@@ -120,6 +120,7 @@ func (s *Service) Login(ctx context.Context, telegramUser int64, username, passw
 	session := &storage.AdminSession{
 		TelegramUser: telegramUser,
 		AdminID:      adminID,
+		IsSuper:      authzResp.IsSuper,
 		Username:     normalizeUsername(loginResp.User.Username, username),
 		JWTToken:     token,
 		JWTExpiresAt: expiresAt,
@@ -202,6 +203,7 @@ func sessionToView(session *storage.AdminSession) (*SessionView, error) {
 	return &SessionView{
 		TelegramUser: session.TelegramUser,
 		AdminID:      session.AdminID,
+		IsSuper:      session.IsSuper,
 		Username:     session.Username,
 		JWTToken:     session.JWTToken,
 		JWTExpiresAt: session.JWTExpiresAt,

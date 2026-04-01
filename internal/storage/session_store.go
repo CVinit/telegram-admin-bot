@@ -34,6 +34,7 @@ func (s *SessionStore) UpsertSession(ctx context.Context, session *AdminSession)
 		Columns: []clause.Column{{Name: "telegram_user"}},
 		DoUpdates: clause.Assignments(map[string]any{
 			"admin_id":       session.AdminID,
+			"is_super":       session.IsSuper,
 			"username":       session.Username,
 			"jwt_token":      session.JWTToken,
 			"jwt_expires_at": session.JWTExpiresAt,

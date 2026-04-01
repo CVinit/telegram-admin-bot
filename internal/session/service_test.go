@@ -71,6 +71,22 @@ func TestLogoutDeletesStoredSession(t *testing.T) {
 	}
 }
 
+func TestRequireSessionRestoresIsSuperFlag(t *testing.T) {
+	deps := newSessionTestDeps(t)
+
+	if _, err := deps.Service.Login(context.Background(), 123456792, "ops", "secret"); err != nil {
+		t.Fatal(err)
+	}
+
+	view, err := deps.Service.RequireSession(context.Background(), 123456792)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !view.IsSuper {
+		t.Fatalf("expected IsSuper to persist across session reload, got %#v", view)
+	}
+}
+
 type sessionTestDeps struct {
 	Service *Service
 	Store   *storage.SessionStore

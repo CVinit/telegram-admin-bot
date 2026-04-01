@@ -12,6 +12,7 @@ type AdminSession struct {
 	ID           uint  `gorm:"primaryKey"`
 	TelegramUser int64 `gorm:"uniqueIndex;not null"`
 	AdminID      uint  `gorm:"index;not null"`
+	IsSuper      bool
 	Username     string
 	JWTToken     string
 	JWTExpiresAt time.Time
