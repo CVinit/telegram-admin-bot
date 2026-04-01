@@ -140,6 +140,80 @@ func TestSalesCommandRoutesRequestedRange(t *testing.T) {
 	}
 }
 
+func TestShipCommandRoutesRequestedOrder(t *testing.T) {
+	flow := &stubFulfillmentWorkflow{
+		singlePreview: &workflow.SingleFulfillmentPreviewView{
+			ActionKey:      "fulfillment_confirm:1",
+			OrderID:        11,
+			OrderNo:        "DJ1001",
+			DeliveryKind:   "payload",
+			PayloadPreview: "card-1",
+		},
+	}
+
+	router := NewRouter(&stubSessionService{
+		requireView: &session.SessionView{
+			TelegramUser: 123456789,
+			AdminID:      3,
+			Username:     "ops",
+			JWTToken:     "jwt-demo",
+		},
+	}).WithFulfillmentWorkflow(flow)
+
+	result, err := router.Handle(context.Background(), IncomingUpdate{
+		TelegramUser: 123456789,
+		ChatID:       123456789,
+		ChatType:     ChatTypePrivate,
+		Text:         "/ship DJ1001\ncard-1",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if flow.lastOrderNo != "DJ1001" {
+		t.Fatalf("expected order number DJ1001, got %q", flow.lastOrderNo)
+	}
+	if !strings.Contains(result.Text, "DJ1001") {
+		t.Fatalf("unexpected ship response: %#v", result)
+	}
+}
+
+func TestBatchShipCommandRoutesFilterAndDelivery(t *testing.T) {
+	flow := &stubFulfillmentWorkflow{
+		batchPreview: &workflow.BatchFulfillmentPreviewView{
+			ActionKey:      "fulfillment_batch_confirm:1",
+			OrderCount:     1,
+			OrderNos:       []string{"DJ1001"},
+			DeliveryKind:   "payload",
+			PayloadPreview: "card-1",
+		},
+	}
+
+	router := NewRouter(&stubSessionService{
+		requireView: &session.SessionView{
+			TelegramUser: 123456789,
+			AdminID:      3,
+			Username:     "ops",
+			JWTToken:     "jwt-demo",
+		},
+	}).WithFulfillmentWorkflow(flow)
+
+	result, err := router.Handle(context.Background(), IncomingUpdate{
+		TelegramUser: 123456789,
+		ChatID:       123456789,
+		ChatType:     ChatTypePrivate,
+		Text:         "/batch_ship status=paid product=vip limit=5\ncard-1",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if flow.lastBatchFilter.ProductKeyword != "vip" || flow.lastBatchFilter.Limit != 5 {
+		t.Fatalf("unexpected batch filter: %#v", flow.lastBatchFilter)
+	}
+	if !strings.Contains(result.Text, "批量发货预览") {
+		t.Fatalf("unexpected batch ship response: %#v", result)
+	}
+}
+
 func TestRestockCommandBuildsPreviewWithConfirmButton(t *testing.T) {
 	restock := &stubRestockWorkflow{
 		preview: &workflow.RestockPreviewView{
@@ -257,6 +331,38 @@ type stubSalesWorkflow struct {
 func (s *stubSalesWorkflow) BuildOverview(_ context.Context, _ *session.SessionView, rangeKey string) (*workflow.SalesOverviewView, error) {
 	s.lastRange = rangeKey
 	return s.response, s.err
+}
+
+type stubFulfillmentWorkflow struct {
+	lastOrderNo     string
+	lastDelivery    string
+	singlePreview   *workflow.SingleFulfillmentPreviewView
+	singleResult    *workflow.SingleFulfillmentResultView
+	lastBatchFilter workflow.BatchFulfillmentFilter
+	lastBatchBody   string
+	batchPreview    *workflow.BatchFulfillmentPreviewView
+	batchResult     *workflow.BatchFulfillmentResultView
+	err             error
+}
+
+func (s *stubFulfillmentWorkflow) BuildSinglePreview(_ context.Context, _ *session.SessionView, orderNo string, rawDelivery string) (*workflow.SingleFulfillmentPreviewView, error) {
+	s.lastOrderNo = orderNo
+	s.lastDelivery = rawDelivery
+	return s.singlePreview, s.err
+}
+
+func (s *stubFulfillmentWorkflow) ConfirmSingle(_ context.Context, _ *session.SessionView, _ string) (*workflow.SingleFulfillmentResultView, error) {
+	return s.singleResult, s.err
+}
+
+func (s *stubFulfillmentWorkflow) BuildBatchPreview(_ context.Context, _ *session.SessionView, filter workflow.BatchFulfillmentFilter, rawDelivery string) (*workflow.BatchFulfillmentPreviewView, error) {
+	s.lastBatchFilter = filter
+	s.lastBatchBody = rawDelivery
+	return s.batchPreview, s.err
+}
+
+func (s *stubFulfillmentWorkflow) ConfirmBatch(_ context.Context, _ *session.SessionView, _ string) (*workflow.BatchFulfillmentResultView, error) {
+	return s.batchResult, s.err
 }
 
 type stubRestockWorkflow struct {

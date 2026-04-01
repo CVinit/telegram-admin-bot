@@ -43,9 +43,11 @@ func New(cfg config.Config) (*App, error) {
 	confirmationService := workflow.NewConfirmationService(pendingStore, time.Duration(cfg.ActionConfirmTTLSeconds)*time.Second)
 	salesWorkflow := workflow.NewSalesWorkflow(apiClient)
 	restockWorkflow := workflow.NewRestockWorkflow(apiClient, confirmationService, auditService)
+	fulfillmentWorkflow := workflow.NewFulfillmentWorkflow(apiClient, confirmationService, auditService)
 	router := telegram.NewRouter(sessionService).
 		WithSalesWorkflow(salesWorkflow).
-		WithRestockWorkflow(restockWorkflow)
+		WithRestockWorkflow(restockWorkflow).
+		WithFulfillmentWorkflow(fulfillmentWorkflow)
 	runtime, err := telegram.NewRuntime(cfg.BotToken, router)
 	if err != nil {
 		return nil, fmt.Errorf("create telegram runtime: %w", err)

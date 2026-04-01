@@ -16,9 +16,10 @@ type sessionService interface {
 }
 
 type Router struct {
-	sessions sessionService
-	sales    salesWorkflow
-	restock  restockWorkflow
+	sessions    sessionService
+	sales       salesWorkflow
+	restock     restockWorkflow
+	fulfillment fulfillmentWorkflow
 }
 
 func NewRouter(sessions sessionService) *Router {
@@ -59,9 +60,9 @@ func (r *Router) Handle(ctx context.Context, update IncomingUpdate) (*Response, 
 	case "/restock":
 		return r.handleRestock(ctx, update, args)
 	case "/ship":
-		return r.handlePlaceholder(ctx, update, "单个发货")
+		return r.handleShip(ctx, update, args)
 	case "/batch_ship":
-		return r.handlePlaceholder(ctx, update, "批量发货")
+		return r.handleBatchShip(ctx, update, args)
 	default:
 		return &Response{Text: helpSummaryText}, nil
 	}
@@ -74,6 +75,12 @@ func (r *Router) handleCallback(ctx context.Context, update IncomingUpdate) (*Re
 	default:
 		if strings.HasPrefix(strings.TrimSpace(update.CallbackData), workflow.RestockConfirmPrefix) {
 			return r.handleRestockConfirm(ctx, update)
+		}
+		if strings.HasPrefix(strings.TrimSpace(update.CallbackData), workflow.FulfillmentBatchConfirmPrefix) {
+			return r.handleBatchFulfillmentConfirm(ctx, update)
+		}
+		if strings.HasPrefix(strings.TrimSpace(update.CallbackData), workflow.FulfillmentConfirmPrefix) {
+			return r.handleFulfillmentConfirm(ctx, update)
 		}
 		return &Response{
 			Text:         "未识别的菜单操作。",
