@@ -13,6 +13,7 @@ import (
 )
 
 const defaultHTTPTimeout = 15 * time.Second
+const maxResponseBodyBytes = 2 << 20
 
 type Client struct {
 	baseURL    string
@@ -30,10 +31,13 @@ func (e *APIError) Error() string {
 	if e == nil {
 		return ""
 	}
-	if e.RequestID != "" {
-		return fmt.Sprintf("dujiao api error: status_code=%d msg=%q request_id=%s", e.StatusCode, e.Message, e.RequestID)
+	if e.HTTPStatus > 0 && e.StatusCode == 0 {
+		return fmt.Sprintf("dujiao api error: http_status=%d msg=%q", e.HTTPStatus, e.Message)
 	}
-	return fmt.Sprintf("dujiao api error: status_code=%d msg=%q", e.StatusCode, e.Message)
+	if e.RequestID != "" {
+		return fmt.Sprintf("dujiao api error: status_code=%d http_status=%d msg=%q request_id=%s", e.StatusCode, e.HTTPStatus, e.Message, e.RequestID)
+	}
+	return fmt.Sprintf("dujiao api error: status_code=%d http_status=%d msg=%q", e.StatusCode, e.HTTPStatus, e.Message)
 }
 
 type responseEnvelopeRaw struct {
@@ -130,7 +134,7 @@ func (c *Client) doRequest(ctx context.Context, method, path string, token strin
 	}
 	defer resp.Body.Close()
 
-	rawBody, err := io.ReadAll(resp.Body)
+	rawBody, err := io.ReadAll(io.LimitReader(resp.Body, maxResponseBodyBytes))
 	if err != nil {
 		return nil, fmt.Errorf("read response body: %w", err)
 	}
@@ -147,6 +151,13 @@ func (c *Client) doRequest(ctx context.Context, method, path string, token strin
 
 	var envelope responseEnvelopeRaw
 	if err := json.Unmarshal(rawBody, &envelope); err != nil {
+		if resp.StatusCode >= http.StatusBadRequest {
+			return nil, &APIError{
+				StatusCode: resp.StatusCode,
+				Message:    strings.TrimSpace(string(rawBody)),
+				HTTPStatus: resp.StatusCode,
+			}
+		}
 		return nil, fmt.Errorf("decode response envelope: %w", err)
 	}
 
@@ -154,7 +165,9 @@ func (c *Client) doRequest(ctx context.Context, method, path string, token strin
 	if statusCode == 0 && envelope.Code != 0 {
 		statusCode = envelope.Code
 	}
-
+	if statusCode == 0 && resp.StatusCode >= http.StatusBadRequest {
+		statusCode = resp.StatusCode
+	}
 	if statusCode != 0 || resp.StatusCode >= http.StatusBadRequest {
 		msg := strings.TrimSpace(envelope.Msg)
 		if msg == "" {
@@ -209,7 +222,7 @@ func (c *Client) doPageRequest(ctx context.Context, method, path string, token s
 	}
 	defer resp.Body.Close()
 
-	rawBody, err := io.ReadAll(resp.Body)
+	rawBody, err := io.ReadAll(io.LimitReader(resp.Body, maxResponseBodyBytes))
 	if err != nil {
 		return nil, fmt.Errorf("read response body: %w", err)
 	}
@@ -226,12 +239,22 @@ func (c *Client) doPageRequest(ctx context.Context, method, path string, token s
 
 	var envelope pageEnvelopeRaw
 	if err := json.Unmarshal(rawBody, &envelope); err != nil {
+		if resp.StatusCode >= http.StatusBadRequest {
+			return nil, &APIError{
+				StatusCode: resp.StatusCode,
+				Message:    strings.TrimSpace(string(rawBody)),
+				HTTPStatus: resp.StatusCode,
+			}
+		}
 		return nil, fmt.Errorf("decode paged response envelope: %w", err)
 	}
 
 	statusCode := envelope.StatusCode
 	if statusCode == 0 && envelope.Code != 0 {
 		statusCode = envelope.Code
+	}
+	if statusCode == 0 && resp.StatusCode >= http.StatusBadRequest {
+		statusCode = resp.StatusCode
 	}
 	if statusCode != 0 || resp.StatusCode >= http.StatusBadRequest {
 		msg := strings.TrimSpace(envelope.Msg)
