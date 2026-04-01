@@ -1,0 +1,102 @@
+package telegram
+
+import (
+	"context"
+	"errors"
+	"strings"
+
+	"github.com/dujiao-next/dujiao-next/telegram-admin-bot/internal/session"
+)
+
+type sessionService interface {
+	Login(ctx context.Context, telegramUser int64, username, password string) (*session.SessionView, error)
+	RequireSession(ctx context.Context, telegramUser int64) (*session.SessionView, error)
+	Logout(ctx context.Context, telegramUser int64) error
+}
+
+type Router struct {
+	sessions sessionService
+}
+
+func NewRouter(sessions sessionService) *Router {
+	return &Router{sessions: sessions}
+}
+
+func (r *Router) Handle(ctx context.Context, update IncomingUpdate) (*Response, error) {
+	if r == nil {
+		return nil, errors.New("router is nil")
+	}
+	if r.sessions == nil {
+		return nil, errors.New("session service is nil")
+	}
+
+	if strings.TrimSpace(update.CallbackData) != "" {
+		return r.handleCallback(ctx, update)
+	}
+
+	command, args := parseCommand(update.Text)
+	if command == "" {
+		return &Response{Text: helpSummaryText}, nil
+	}
+	if isSensitiveCommand(command) && !update.IsPrivateChat() {
+		return &Response{Text: privateChatOnlyText}, nil
+	}
+
+	switch command {
+	case "/login":
+		return r.handleLogin(ctx, update, args)
+	case "/logout":
+		return r.handleLogout(ctx, update)
+	case "/session":
+		return r.handleSession(ctx, update)
+	case "/help":
+		return r.handleHelp(ctx, update)
+	case "/sales":
+		return r.handlePlaceholder(ctx, update, "销售统计")
+	case "/restock":
+		return r.handlePlaceholder(ctx, update, "补自动库存")
+	case "/ship":
+		return r.handlePlaceholder(ctx, update, "单个发货")
+	case "/batch_ship":
+		return r.handlePlaceholder(ctx, update, "批量发货")
+	default:
+		return &Response{Text: helpSummaryText}, nil
+	}
+}
+
+func (r *Router) handleCallback(ctx context.Context, update IncomingUpdate) (*Response, error) {
+	switch strings.TrimSpace(update.CallbackData) {
+	case CallbackMenuHome:
+		return r.handleMenuHome(ctx, update)
+	default:
+		return &Response{
+			Text:         "未识别的菜单操作。",
+			CallbackID:   update.CallbackID,
+			CallbackText: "未识别的菜单操作",
+		}, nil
+	}
+}
+
+func parseCommand(text string) (string, []string) {
+	fields := strings.Fields(strings.TrimSpace(text))
+	if len(fields) == 0 {
+		return "", nil
+	}
+	command := fields[0]
+	if alias := menuAliasToCommand(command); alias != "" {
+		return alias, fields[1:]
+	}
+	if !strings.HasPrefix(command, "/") {
+		return "", nil
+	}
+	return trimCommandToken(command), fields[1:]
+}
+
+func isSensitiveCommand(command string) bool {
+	switch command {
+	case "/login", "/logout", "/session", "/sales", "/restock", "/ship", "/batch_ship":
+		return true
+	default:
+		return false
+	}
+}
