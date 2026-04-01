@@ -16,6 +16,7 @@ type sessionService interface {
 
 type Router struct {
 	sessions sessionService
+	sales    salesWorkflow
 }
 
 func NewRouter(sessions sessionService) *Router {
@@ -52,7 +53,7 @@ func (r *Router) Handle(ctx context.Context, update IncomingUpdate) (*Response, 
 	case "/help":
 		return r.handleHelp(ctx, update)
 	case "/sales":
-		return r.handlePlaceholder(ctx, update, "销售统计")
+		return r.handleSales(ctx, update, args)
 	case "/restock":
 		return r.handlePlaceholder(ctx, update, "补自动库存")
 	case "/ship":
@@ -84,7 +85,11 @@ func parseCommand(text string) (string, []string) {
 	}
 	command := fields[0]
 	if alias := menuAliasToCommand(command); alias != "" {
-		return alias, fields[1:]
+		aliasFields := strings.Fields(alias)
+		if len(aliasFields) == 0 {
+			return "", nil
+		}
+		return trimCommandToken(aliasFields[0]), append(aliasFields[1:], fields[1:]...)
 	}
 	if !strings.HasPrefix(command, "/") {
 		return "", nil

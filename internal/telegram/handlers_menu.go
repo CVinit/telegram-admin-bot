@@ -7,6 +7,9 @@ import (
 
 const (
 	menuTextSales      = "销售统计"
+	menuTextSalesToday = "今日销售"
+	menuTextSalesWeek  = "本周销售"
+	menuTextSalesMonth = "本月销售"
 	menuTextRestock    = "补自动库存"
 	menuTextShip       = "单个发货"
 	menuTextBatchShip  = "批量发货"
@@ -14,7 +17,7 @@ const (
 	menuTextHelp       = "帮助"
 	menuTextLogout     = "退出登录"
 	menuHomeTitle      = "管理员菜单"
-	helpSummaryText    = "可用命令: /login /logout /session /help /sales /restock /ship /batch_ship"
+	helpSummaryText    = "可用命令: /login /logout /session /help /sales today|week|month /restock /ship /batch_ship"
 	notLoggedInSummary = "当前未登录，请先使用 /login <username> <password>。"
 )
 
@@ -43,7 +46,8 @@ func (r *Router) handlePlaceholder(_ context.Context, update IncomingUpdate, fea
 
 func buildHomeKeyboard() [][]Button {
 	return [][]Button{
-		{{Text: menuTextSales}, {Text: menuTextRestock}},
+		{{Text: menuTextSalesToday}, {Text: menuTextSalesWeek}, {Text: menuTextSalesMonth}},
+		{{Text: menuTextRestock}},
 		{{Text: menuTextShip}, {Text: menuTextBatchShip}},
 		{{Text: menuTextSession}, {Text: menuTextHelp}},
 		{{Text: menuTextLogout}},
@@ -52,6 +56,12 @@ func buildHomeKeyboard() [][]Button {
 
 func menuAliasToCommand(text string) string {
 	switch strings.TrimSpace(text) {
+	case menuTextSalesToday:
+		return "/sales today"
+	case menuTextSalesWeek:
+		return "/sales week"
+	case menuTextSalesMonth:
+		return "/sales month"
 	case menuTextSales:
 		return "/sales"
 	case menuTextRestock:

@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/dujiao-next/dujiao-next/telegram-admin-bot/internal/session"
+	"github.com/dujiao-next/dujiao-next/telegram-admin-bot/internal/workflow"
 )
 
 func TestRejectsSensitiveCommandOutsidePrivateChat(t *testing.T) {
@@ -101,6 +102,44 @@ func TestMenuHomeCallbackReturnsKeyboard(t *testing.T) {
 	}
 }
 
+func TestSalesCommandRoutesRequestedRange(t *testing.T) {
+	sales := &stubSalesWorkflow{
+		response: &workflow.SalesOverviewView{
+			RangeKey:   "week",
+			Title:      "本周销售",
+			GMVPaid:    "100.00",
+			Currency:   "CNY",
+			Timezone:   "Asia/Shanghai",
+			PaidOrders: 5,
+		},
+	}
+
+	router := NewRouter(&stubSessionService{
+		requireView: &session.SessionView{
+			TelegramUser: 123456789,
+			AdminID:      3,
+			Username:     "ops",
+			JWTToken:     "jwt-demo",
+		},
+	}).WithSalesWorkflow(sales)
+
+	result, err := router.Handle(context.Background(), IncomingUpdate{
+		TelegramUser: 123456789,
+		ChatID:       123456789,
+		ChatType:     ChatTypePrivate,
+		Text:         "/sales week",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if sales.lastRange != "week" {
+		t.Fatalf("expected sales workflow range=week, got %q", sales.lastRange)
+	}
+	if !strings.Contains(result.Text, "本周销售") {
+		t.Fatalf("unexpected sales response: %#v", result)
+	}
+}
+
 type stubSessionService struct {
 	loginView   *session.SessionView
 	loginErr    error
@@ -131,4 +170,15 @@ func (s *stubSessionService) RequireSession(_ context.Context, _ int64) (*sessio
 
 func (s *stubSessionService) Logout(_ context.Context, _ int64) error {
 	return s.logoutErr
+}
+
+type stubSalesWorkflow struct {
+	lastRange string
+	response  *workflow.SalesOverviewView
+	err       error
+}
+
+func (s *stubSalesWorkflow) BuildOverview(_ context.Context, _ *session.SessionView, rangeKey string) (*workflow.SalesOverviewView, error) {
+	s.lastRange = rangeKey
+	return s.response, s.err
 }

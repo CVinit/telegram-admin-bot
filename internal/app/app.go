@@ -11,6 +11,7 @@ import (
 	"github.com/dujiao-next/dujiao-next/telegram-admin-bot/internal/session"
 	"github.com/dujiao-next/dujiao-next/telegram-admin-bot/internal/storage"
 	"github.com/dujiao-next/dujiao-next/telegram-admin-bot/internal/telegram"
+	"github.com/dujiao-next/dujiao-next/telegram-admin-bot/internal/workflow"
 )
 
 type App struct {
@@ -34,7 +35,8 @@ func New(cfg config.Config) (*App, error) {
 	apiClient := dujiao.New(cfg.DujiaoBaseURL)
 	sessionStore := storage.NewSessionStore(db)
 	sessionService := session.NewService(apiClient, sessionStore)
-	router := telegram.NewRouter(sessionService)
+	salesWorkflow := workflow.NewSalesWorkflow(apiClient)
+	router := telegram.NewRouter(sessionService).WithSalesWorkflow(salesWorkflow)
 	runtime, err := telegram.NewRuntime(cfg.BotToken, router)
 	if err != nil {
 		return nil, fmt.Errorf("create telegram runtime: %w", err)
