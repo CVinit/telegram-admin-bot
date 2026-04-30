@@ -1,0 +1,11 @@
+.env
+.DS_Store
+data/
+*.db
+*.log
+.cache/
+.tmp/
+.verify*/
+.mod-*/
+dist/
+
