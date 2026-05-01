@@ -4,8 +4,8 @@ import (
 	"context"
 	"log"
 
-	"github.com/dujiao-next/dujiao-next/telegram-admin-bot/internal/app"
-	"github.com/dujiao-next/dujiao-next/telegram-admin-bot/internal/config"
+	"github.com/CVinit/telegram-admin-bot/internal/app"
+	"github.com/CVinit/telegram-admin-bot/internal/config"
 )
 
 func main() {

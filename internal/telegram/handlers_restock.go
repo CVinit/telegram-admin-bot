@@ -6,9 +6,9 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/dujiao-next/dujiao-next/telegram-admin-bot/internal/render"
-	"github.com/dujiao-next/dujiao-next/telegram-admin-bot/internal/session"
-	"github.com/dujiao-next/dujiao-next/telegram-admin-bot/internal/workflow"
+	"github.com/CVinit/telegram-admin-bot/internal/render"
+	"github.com/CVinit/telegram-admin-bot/internal/session"
+	"github.com/CVinit/telegram-admin-bot/internal/workflow"
 )
 
 const restockUsageText = "用法:\n/restock <product_id> [sku_id]\n下一行开始粘贴卡密，或上传 csv/txt 并把命令写在 caption。"

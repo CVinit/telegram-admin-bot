@@ -1,4 +1,4 @@
-module github.com/dujiao-next/dujiao-next/telegram-admin-bot
+module github.com/CVinit/telegram-admin-bot
 
 go 1.25.3
 

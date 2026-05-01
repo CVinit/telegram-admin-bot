@@ -6,8 +6,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/dujiao-next/dujiao-next/telegram-admin-bot/internal/session"
-	"github.com/dujiao-next/dujiao-next/telegram-admin-bot/internal/workflow"
+	"github.com/CVinit/telegram-admin-bot/internal/session"
+	"github.com/CVinit/telegram-admin-bot/internal/workflow"
 )
 
 func TestRejectsSensitiveCommandOutsidePrivateChat(t *testing.T) {

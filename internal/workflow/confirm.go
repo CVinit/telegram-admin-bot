@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/dujiao-next/dujiao-next/telegram-admin-bot/internal/storage"
+	"github.com/CVinit/telegram-admin-bot/internal/storage"
 )
 
 var ErrConfirmationNotFound = errors.New("confirmation not found or expired")

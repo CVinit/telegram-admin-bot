@@ -70,7 +70,7 @@ Run the local smoke checks:
 GitHub Actions builds and pushes the bot image to GHCR:
 
 ```text
-ghcr.io/dujiao-next/dujiao-next/telegram-admin-bot:latest
+ghcr.io/cvinit/telegram-admin-bot:latest
 ```
 
 Use `latest` for the newest `main` build, or pin `sha-<commit>` for a fixed
@@ -99,7 +99,7 @@ Next Admin API. Configure `.env` first:
 
 ```env
 TELEGRAM_BOT_TOKEN=replace-with-your-telegram-bot-token
-TELEGRAM_ADMIN_BOT_IMAGE=ghcr.io/dujiao-next/dujiao-next/telegram-admin-bot:latest
+TELEGRAM_ADMIN_BOT_IMAGE=ghcr.io/cvinit/telegram-admin-bot:latest
 DUJIAO_BASE_URL=https://your-dujiao-domain.com/api/v1
 ```
 

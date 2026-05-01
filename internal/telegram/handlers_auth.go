@@ -5,7 +5,7 @@ import (
 	"errors"
 	"strings"
 
-	"github.com/dujiao-next/dujiao-next/telegram-admin-bot/internal/session"
+	"github.com/CVinit/telegram-admin-bot/internal/session"
 )
 
 func (r *Router) handleLogin(ctx context.Context, update IncomingUpdate, args []string) (*Response, error) {

@@ -7,8 +7,8 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/dujiao-next/dujiao-next/telegram-admin-bot/internal/dujiao"
-	"github.com/dujiao-next/dujiao-next/telegram-admin-bot/internal/session"
+	"github.com/CVinit/telegram-admin-bot/internal/dujiao"
+	"github.com/CVinit/telegram-admin-bot/internal/session"
 )
 
 const FulfillmentConfirmPrefix = "fulfillment_confirm"

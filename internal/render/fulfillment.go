@@ -4,7 +4,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/dujiao-next/dujiao-next/telegram-admin-bot/internal/workflow"
+	"github.com/CVinit/telegram-admin-bot/internal/workflow"
 )
 
 func RenderSingleFulfillmentPreview(view *workflow.SingleFulfillmentPreviewView) string {

@@ -5,9 +5,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dujiao-next/dujiao-next/telegram-admin-bot/internal/dujiao"
-	"github.com/dujiao-next/dujiao-next/telegram-admin-bot/internal/session"
-	"github.com/dujiao-next/dujiao-next/telegram-admin-bot/internal/storage"
+	"github.com/CVinit/telegram-admin-bot/internal/dujiao"
+	"github.com/CVinit/telegram-admin-bot/internal/session"
+	"github.com/CVinit/telegram-admin-bot/internal/storage"
 )
 
 func TestParseRestockTextDropsBlankLinesAndDuplicates(t *testing.T) {

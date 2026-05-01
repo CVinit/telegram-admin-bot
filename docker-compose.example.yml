@@ -1,6 +1,6 @@
 services:
   telegram-admin-bot:
-    image: "${TELEGRAM_ADMIN_BOT_IMAGE:-ghcr.io/dujiao-next/dujiao-next/telegram-admin-bot:latest}"
+    image: "${TELEGRAM_ADMIN_BOT_IMAGE:-ghcr.io/cvinit/telegram-admin-bot:latest}"
     pull_policy: always
     restart: unless-stopped
     environment:

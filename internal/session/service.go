@@ -8,8 +8,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/dujiao-next/dujiao-next/telegram-admin-bot/internal/dujiao"
-	"github.com/dujiao-next/dujiao-next/telegram-admin-bot/internal/storage"
+	"github.com/CVinit/telegram-admin-bot/internal/dujiao"
+	"github.com/CVinit/telegram-admin-bot/internal/storage"
 )
 
 var (
