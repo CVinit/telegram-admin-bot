@@ -1,8 +1,7 @@
 services:
   telegram-admin-bot:
-    build:
-      context: .
-      dockerfile: Dockerfile
+    image: "${TELEGRAM_ADMIN_BOT_IMAGE:-ghcr.io/dujiao-next/dujiao-next/telegram-admin-bot:latest}"
+    pull_policy: always
     restart: unless-stopped
     environment:
       TELEGRAM_BOT_TOKEN: "${TELEGRAM_BOT_TOKEN:?set TELEGRAM_BOT_TOKEN in .env}"

@@ -65,7 +65,18 @@ Run the local smoke checks:
 ./scripts/smoke_local.sh
 ```
 
-## Docker Build
+## Docker Image
+
+GitHub Actions builds and pushes the bot image to GHCR:
+
+```text
+ghcr.io/dujiao-next/dujiao-next/telegram-admin-bot:latest
+```
+
+Use `latest` for the newest `main` build, or pin `sha-<commit>` for a fixed
+deployment.
+
+## Local Docker Build
 
 ```bash
 docker build -t telegram-admin-bot:local .
@@ -83,32 +94,33 @@ docker run --rm \
 
 ## Docker Compose
 
-If both containers run in the same Compose project, prefer the service name instead of
-host `localhost`:
+The checked-in compose example runs only the bot and points it at an existing Dujiao
+Next Admin API. Configure `.env` first:
 
-```yaml
-environment:
-  DUJIAO_BASE_URL: http://api:8080/api/v1
+```env
+TELEGRAM_BOT_TOKEN=replace-with-your-telegram-bot-token
+TELEGRAM_ADMIN_BOT_IMAGE=ghcr.io/dujiao-next/dujiao-next/telegram-admin-bot:latest
+DUJIAO_BASE_URL=https://your-dujiao-domain.com/api/v1
 ```
 
 Bring the stack up:
 
 ```bash
 mkdir -p data
-docker compose -f docker-compose.example.yml up --build
+docker compose -f docker-compose.example.yml pull
+docker compose -f docker-compose.example.yml up -d
 ```
 
-The sample compose file shows:
-
-- `api` service for Dujiao Next API
-- `worker` service for async tasks
-- `telegram-admin-bot` sidecar service
-- a shared local network where the bot reaches the API by service name
-
-If you deploy the bot directly on the host instead of inside Docker, keep:
+If the Dujiao API runs on the host machine, use:
 
 ```env
-DUJIAO_BASE_URL=http://127.0.0.1:8080/api/v1
+DUJIAO_BASE_URL=http://host.docker.internal:8080/api/v1
+```
+
+If both containers run in the same Compose network, use the Dujiao API service name:
+
+```env
+DUJIAO_BASE_URL=http://api:8080/api/v1
 ```
 
 ## Commands
