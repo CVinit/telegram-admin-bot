@@ -200,7 +200,7 @@ func validateManualFulfillmentOrder(order *dujiao.OrderDetail) error {
 		return fmt.Errorf("order %s already fulfilled", order.OrderNo)
 	}
 	switch strings.TrimSpace(order.Status) {
-	case "paid", "fulfilling":
+	case "paid", "fulfilling", "delivering":
 	default:
 		return fmt.Errorf("order %s status %s is not fulfillable", order.OrderNo, order.Status)
 	}

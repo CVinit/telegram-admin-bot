@@ -12,8 +12,9 @@ import (
 
 const (
 	shipUsageText        = "用法:\n/ship <order_no>\n下一行开始填写发货内容，若每行是 key=value 则会转成结构化 delivery_data。"
-	batchShipUsageText   = "用法:\n/batch_ship [status=paid|fulfilling|pending] [product_id=<id>] [sku_id=<id>] [product=<keyword>] [from=<date>] [to=<date>] [limit=<n>]\n下一行开始填写发货内容。指定 product_id 后，每行一条卡密，Bot 会按付款顺序和订单数量自动分配。"
-	pendingShipUsageText = "用法:\n/pending_ship [status=paid|fulfilling|pending] [product_id=<id>] [sku_id=<id>] [product=<keyword>] [from=<date>] [to=<date>] [limit=<n>]"
+	batchShipUsageText   = "用法:\n/batch_ship [status=paid|fulfilling|pending|delivering] [product_id=<id>] [sku_id=<id>] [product=<keyword>] [from=<date>] [to=<date>] [limit=<n>]\n下一行开始填写发货内容。指定 product_id 后，每行一条卡密，Bot 会按付款顺序和订单数量自动分配。"
+	pendingShipUsageText = "用法:\n/pending_ship [status=paid|fulfilling|pending|delivering] [product_id=<id>] [sku_id=<id>] [product=<keyword>] [from=<date>] [to=<date>] [limit=<n>]"
+	deliveringUsageText  = "用法:\n/delivering [product_id=<id>] [sku_id=<id>] [product=<keyword>] [from=<date>] [to=<date>] [limit=<n>]\n查询正在交付中的订单（status=delivering）。"
 )
 
 type fulfillmentWorkflow interface {
@@ -151,6 +152,28 @@ func (r *Router) handleBatchFulfillmentConfirm(ctx context.Context, update Incom
 		CallbackID:   update.CallbackID,
 		CallbackText: "批量发货已执行",
 	}, nil
+}
+
+func (r *Router) handleDelivering(ctx context.Context, update IncomingUpdate, args []string) (*Response, error) {
+	if r.fulfillment == nil {
+		return r.handlePlaceholder(ctx, update, "交付中订单")
+	}
+
+	view, err := r.sessions.RequireSession(ctx, update.TelegramUser)
+	if err != nil {
+		return r.renderSessionRequired(err), nil
+	}
+
+	filter, err := parseBatchShipFilter(args)
+	if err != nil {
+		return &Response{Text: deliveringUsageText}, nil
+	}
+	filter.Status = "delivering"
+	list, err := r.fulfillment.BuildPendingList(ctx, view, filter)
+	if err != nil {
+		return &Response{Text: "查询交付中订单失败: " + err.Error()}, nil
+	}
+	return &Response{Text: render.RenderPendingFulfillmentList(list)}, nil
 }
 
 func parseBatchShipFilter(args []string) (workflow.BatchFulfillmentFilter, error) {

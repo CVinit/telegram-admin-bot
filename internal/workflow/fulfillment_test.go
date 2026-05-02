@@ -75,6 +75,9 @@ func TestBuildPendingListIncludesPaidAndFulfillingManualOrdersForProduct(t *test
 				{ID: 23, OrderNo: "DJ2003", Status: "fulfilling", PaidAt: "2026-04-02T10:06:00Z", CreatedAt: "2026-04-02T09:59:00Z"},
 			},
 		},
+		"delivering": {
+			Items: []dujiao.OrderListItem{},
+		},
 	}
 	deps.API.ordersByID[21] = &dujiao.OrderDetail{
 		ID:        21,
@@ -124,8 +127,8 @@ func TestBuildPendingListIncludesPaidAndFulfillingManualOrdersForProduct(t *test
 	if len(view.Items) != 2 || view.Items[0].OrderNo != "DJ2001" || view.Items[1].OrderNo != "DJ2002" {
 		t.Fatalf("expected paid order sequence, got %#v", view.Items)
 	}
-	if len(deps.API.listOrderCalls) != 2 || deps.API.listOrderCalls[0].Status != "paid" || deps.API.listOrderCalls[1].Status != "fulfilling" {
-		t.Fatalf("expected paid and fulfilling list calls, got %#v", deps.API.listOrderCalls)
+	if len(deps.API.listOrderCalls) != 3 || deps.API.listOrderCalls[0].Status != "paid" || deps.API.listOrderCalls[1].Status != "fulfilling" || deps.API.listOrderCalls[2].Status != "delivering" {
+		t.Fatalf("expected paid, fulfilling and delivering list calls, got %#v", deps.API.listOrderCalls)
 	}
 }
 
