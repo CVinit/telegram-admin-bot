@@ -12,12 +12,13 @@ const (
 	menuTextSalesMonth = "本月销售"
 	menuTextRestock    = "补自动库存"
 	menuTextShip       = "单个发货"
+	menuTextPending    = "待发货订单"
 	menuTextBatchShip  = "批量发货"
 	menuTextSession    = "我的会话"
 	menuTextHelp       = "帮助"
 	menuTextLogout     = "退出登录"
 	menuHomeTitle      = "管理员菜单"
-	helpSummaryText    = "可用命令: /login /logout /session /help /sales today|week|month /restock /ship /batch_ship"
+	helpSummaryText    = "可用命令: /login /logout /session /help /sales today|week|month /restock /pending_ship /ship /batch_ship"
 	notLoggedInSummary = "当前未登录，请先使用 /login <username> <password>。"
 )
 
@@ -48,7 +49,7 @@ func buildHomeKeyboard() [][]Button {
 	return [][]Button{
 		{{Text: menuTextSalesToday}, {Text: menuTextSalesWeek}, {Text: menuTextSalesMonth}},
 		{{Text: menuTextRestock}},
-		{{Text: menuTextShip}, {Text: menuTextBatchShip}},
+		{{Text: menuTextPending}, {Text: menuTextShip}, {Text: menuTextBatchShip}},
 		{{Text: menuTextSession}, {Text: menuTextHelp}},
 		{{Text: menuTextLogout}},
 	}
@@ -68,6 +69,8 @@ func menuAliasToCommand(text string) string {
 		return "/restock"
 	case menuTextShip:
 		return "/ship"
+	case menuTextPending:
+		return "/pending_ship"
 	case menuTextBatchShip:
 		return "/batch_ship"
 	case menuTextSession:

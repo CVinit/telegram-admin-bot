@@ -47,13 +47,13 @@ func (w *SalesWorkflow) BuildOverview(ctx context.Context, sessionView *session.
 		return nil, errors.New("session jwt token is required")
 	}
 
-	normalizedRange, title, err := normalizeSalesRange(rangeKey)
+	apiRange, displayRange, title, err := normalizeSalesRange(rangeKey)
 	if err != nil {
 		return nil, err
 	}
 
 	resp, err := w.api.GetDashboardOverview(ctx, sessionView.JWTToken, dujiao.DashboardOverviewQuery{
-		Range: normalizedRange,
+		Range: apiRange,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("get dashboard overview: %w", err)
@@ -63,7 +63,7 @@ func (w *SalesWorkflow) BuildOverview(ctx context.Context, sessionView *session.
 	}
 
 	return &SalesOverviewView{
-		RangeKey:           normalizedRange,
+		RangeKey:           displayRange,
 		Title:              title,
 		Timezone:           strings.TrimSpace(resp.Timezone),
 		Currency:           strings.TrimSpace(resp.Currency),
@@ -77,15 +77,15 @@ func (w *SalesWorkflow) BuildOverview(ctx context.Context, sessionView *session.
 	}, nil
 }
 
-func normalizeSalesRange(rangeKey string) (string, string, error) {
+func normalizeSalesRange(rangeKey string) (string, string, string, error) {
 	switch strings.ToLower(strings.TrimSpace(rangeKey)) {
 	case "", "today":
-		return "today", "今日销售", nil
+		return "today", "today", "今日销售", nil
 	case "week":
-		return "week", "本周销售", nil
+		return "7d", "week", "本周销售", nil
 	case "month":
-		return "month", "本月销售", nil
+		return "30d", "month", "本月销售", nil
 	default:
-		return "", "", fmt.Errorf("unsupported sales range %q", rangeKey)
+		return "", "", "", fmt.Errorf("unsupported sales range %q", rangeKey)
 	}
 }

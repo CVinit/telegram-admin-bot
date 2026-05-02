@@ -61,6 +61,8 @@ func (r *Router) Handle(ctx context.Context, update IncomingUpdate) (*Response, 
 		return r.handleRestock(ctx, update, args)
 	case "/ship":
 		return r.handleShip(ctx, update, args)
+	case "/pending_ship":
+		return r.handlePendingShip(ctx, update, args)
 	case "/batch_ship":
 		return r.handleBatchShip(ctx, update, args)
 	default:
@@ -119,7 +121,7 @@ func parseCommand(text string) (string, []string) {
 
 func isSensitiveCommand(command string) bool {
 	switch command {
-	case "/login", "/logout", "/session", "/sales", "/restock", "/ship", "/batch_ship":
+	case "/login", "/logout", "/session", "/sales", "/restock", "/ship", "/pending_ship", "/batch_ship":
 		return true
 	default:
 		return false

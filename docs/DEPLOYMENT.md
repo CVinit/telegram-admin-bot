@@ -198,6 +198,26 @@ curl -s "https://你的dujiao域名/api/v1/admin/orders?status=paid&page=1&page_
 
 上面的命令依赖 `jq`。如果没有 `jq`，直接查看原始 JSON 也可以。
 
+## 查询待发货订单
+
+在 Telegram Bot 私聊中发送：
+
+```text
+/pending_ship product_id=9 sku_id=3 limit=20
+```
+
+默认查询 `paid` 和 `fulfilling` 两类待发货订单。支持的过滤参数：
+
+- `status`: 可设为 `paid`、`fulfilling` 或 `pending`，默认 `pending`。
+- `product_id`: 指定商品 ID。
+- `sku_id`: 指定 SKU ID，必须和 `product_id` 一起使用。
+- `product`: 商品关键词，对应管理端订单列表的 `product_keyword`。
+- `from`: 创建时间起点，对应 `created_from`。
+- `to`: 创建时间终点，对应 `created_to`。
+- `limit`: 返回数量，默认 `20`。
+
+指定 `product_id` 后，Bot 会逐个读取订单详情，只保留整个订单都属于该商品和 SKU 范围的人工发货订单，避免混合商品订单被误发。
+
 ## 调试单个发货
 
 在 Telegram Bot 私聊中发送：
@@ -248,13 +268,34 @@ POST /api/v1/admin/fulfillments
 
 支持的过滤参数：
 
-- `status`: 默认 `paid`。
+- `status`: 可设为 `paid`、`fulfilling` 或 `pending`，默认 `pending`。
+- `product_id`: 指定商品 ID。设置后进入同商品卡密分配模式。
+- `sku_id`: 指定 SKU ID，必须和 `product_id` 一起使用。
 - `product`: 商品关键词，对应管理端订单列表的 `product_keyword`。
 - `from`: 创建时间起点，对应 `created_from`。
 - `to`: 创建时间终点，对应 `created_to`。
 - `limit`: 拉取数量，默认 `20`。
 
+同商品批量发货示例：
+
+```text
+/batch_ship product_id=9 sku_id=3 limit=20
+CARD-001
+CARD-002
+CARD-003
+```
+
+该模式下每一行是一条卡密。Bot 会先统计当前筛选范围内的待发货订单和订单数量，并要求卡密行数必须等于总发货数量。预览确认后，Bot 会按付款时间从早到晚分配卡密，例如数量为 2 的订单会收到连续 2 条卡密。数量不匹配或卡密重复时不会生成确认动作。
+
 批量发货同样会先返回预览，点击确认按钮后才执行。
+
+所有发货最终都调用 Dujiao 管理端：
+
+```text
+POST /api/v1/admin/fulfillments
+```
+
+因此邮件、客户 Telegram 通知和下游回调仍由 Dujiao-Next 的人工发货流程触发。Bot 不直接改订单状态，也不绕过 Dujiao 的通知队列。
 
 ## 调试自动发货补库存
 

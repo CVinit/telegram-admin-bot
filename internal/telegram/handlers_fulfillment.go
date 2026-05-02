@@ -11,13 +11,15 @@ import (
 )
 
 const (
-	shipUsageText      = "用法:\n/ship <order_no>\n下一行开始填写发货内容，若每行是 key=value 则会转成结构化 delivery_data。"
-	batchShipUsageText = "用法:\n/batch_ship status=<status> [product=<keyword>] [from=<date>] [to=<date>] [limit=<n>]\n下一行开始填写统一发货内容。"
+	shipUsageText        = "用法:\n/ship <order_no>\n下一行开始填写发货内容，若每行是 key=value 则会转成结构化 delivery_data。"
+	batchShipUsageText   = "用法:\n/batch_ship [status=paid|fulfilling|pending] [product_id=<id>] [sku_id=<id>] [product=<keyword>] [from=<date>] [to=<date>] [limit=<n>]\n下一行开始填写发货内容。指定 product_id 后，每行一条卡密，Bot 会按付款顺序和订单数量自动分配。"
+	pendingShipUsageText = "用法:\n/pending_ship [status=paid|fulfilling|pending] [product_id=<id>] [sku_id=<id>] [product=<keyword>] [from=<date>] [to=<date>] [limit=<n>]"
 )
 
 type fulfillmentWorkflow interface {
 	BuildSinglePreview(ctx context.Context, sessionView *session.SessionView, orderNo string, rawDelivery string) (*workflow.SingleFulfillmentPreviewView, error)
 	ConfirmSingle(ctx context.Context, sessionView *session.SessionView, actionKey string) (*workflow.SingleFulfillmentResultView, error)
+	BuildPendingList(ctx context.Context, sessionView *session.SessionView, filter workflow.BatchFulfillmentFilter) (*workflow.PendingFulfillmentListView, error)
 	BuildBatchPreview(ctx context.Context, sessionView *session.SessionView, filter workflow.BatchFulfillmentFilter, rawDelivery string) (*workflow.BatchFulfillmentPreviewView, error)
 	ConfirmBatch(ctx context.Context, sessionView *session.SessionView, actionKey string) (*workflow.BatchFulfillmentResultView, error)
 }
@@ -55,6 +57,27 @@ func (r *Router) handleShip(ctx context.Context, update IncomingUpdate, args []s
 			{{Text: "确认发货", CallbackData: preview.ActionKey}},
 		},
 	}, nil
+}
+
+func (r *Router) handlePendingShip(ctx context.Context, update IncomingUpdate, args []string) (*Response, error) {
+	if r.fulfillment == nil {
+		return r.handlePlaceholder(ctx, update, "待发货订单")
+	}
+
+	view, err := r.sessions.RequireSession(ctx, update.TelegramUser)
+	if err != nil {
+		return r.renderSessionRequired(err), nil
+	}
+
+	filter, err := parseBatchShipFilter(args)
+	if err != nil {
+		return &Response{Text: pendingShipUsageText}, nil
+	}
+	list, err := r.fulfillment.BuildPendingList(ctx, view, filter)
+	if err != nil {
+		return &Response{Text: "查询待发货订单失败: " + err.Error()}, nil
+	}
+	return &Response{Text: render.RenderPendingFulfillmentList(list)}, nil
 }
 
 func (r *Router) handleBatchShip(ctx context.Context, update IncomingUpdate, args []string) (*Response, error) {
@@ -132,7 +155,7 @@ func (r *Router) handleBatchFulfillmentConfirm(ctx context.Context, update Incom
 
 func parseBatchShipFilter(args []string) (workflow.BatchFulfillmentFilter, error) {
 	filter := workflow.BatchFulfillmentFilter{
-		Status: "paid",
+		Status: "pending",
 		Limit:  20,
 	}
 	for _, arg := range args {
@@ -140,11 +163,25 @@ func parseBatchShipFilter(args []string) (workflow.BatchFulfillmentFilter, error
 		if !ok {
 			return workflow.BatchFulfillmentFilter{}, strconv.ErrSyntax
 		}
+		key = strings.ToLower(strings.TrimSpace(key))
+		value = strings.TrimSpace(value)
 		switch key {
 		case "status":
 			filter.Status = value
 		case "product":
 			filter.ProductKeyword = value
+		case "product_id":
+			parsed, err := strconv.ParseUint(value, 10, 64)
+			if err != nil || parsed == 0 {
+				return workflow.BatchFulfillmentFilter{}, strconv.ErrSyntax
+			}
+			filter.ProductID = uint(parsed)
+		case "sku_id":
+			parsed, err := strconv.ParseUint(value, 10, 64)
+			if err != nil || parsed == 0 {
+				return workflow.BatchFulfillmentFilter{}, strconv.ErrSyntax
+			}
+			filter.SKUID = uint(parsed)
 		case "from":
 			filter.CreatedFrom = value
 		case "to":
@@ -158,6 +195,9 @@ func parseBatchShipFilter(args []string) (workflow.BatchFulfillmentFilter, error
 		default:
 			return workflow.BatchFulfillmentFilter{}, strconv.ErrSyntax
 		}
+	}
+	if filter.SKUID > 0 && filter.ProductID == 0 {
+		return workflow.BatchFulfillmentFilter{}, strconv.ErrSyntax
 	}
 	return filter, nil
 }

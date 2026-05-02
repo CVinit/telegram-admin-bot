@@ -44,11 +44,59 @@ func RenderBatchFulfillmentPreview(view *workflow.BatchFulfillmentPreviewView) s
 	lines := []string{
 		"批量发货预览",
 		"订单数量: " + strconv.Itoa(view.OrderCount),
+		"发货数量: " + strconv.Itoa(view.TotalQuantity),
 		"交付模式: " + view.DeliveryKind,
 		"内容预览: " + fallback(view.PayloadPreview),
 	}
+	if view.ProductID > 0 {
+		lines = append(lines, "Product ID: "+strconv.FormatUint(uint64(view.ProductID), 10))
+	}
+	if view.SKUID > 0 {
+		lines = append(lines, "SKU ID: "+strconv.FormatUint(uint64(view.SKUID), 10))
+	}
+	if view.SecretCount > 0 {
+		lines = append(lines, "卡密数量: "+strconv.Itoa(view.SecretCount))
+	}
 	if len(view.OrderNos) > 0 {
 		lines = append(lines, "订单列表: "+strings.Join(view.OrderNos, ", "))
+	}
+	return strings.Join(lines, "\n")
+}
+
+func RenderPendingFulfillmentList(view *workflow.PendingFulfillmentListView) string {
+	if view == nil {
+		return "待发货订单不可用。"
+	}
+	lines := []string{
+		"待发货订单",
+		"订单数量: " + strconv.Itoa(view.OrderCount),
+		"发货数量: " + strconv.Itoa(view.TotalQuantity),
+	}
+	if len(view.Statuses) > 0 {
+		lines = append(lines, "状态: "+strings.Join(view.Statuses, ", "))
+	}
+	if view.ProductID > 0 {
+		lines = append(lines, "Product ID: "+strconv.FormatUint(uint64(view.ProductID), 10))
+	}
+	if view.SKUID > 0 {
+		lines = append(lines, "SKU ID: "+strconv.FormatUint(uint64(view.SKUID), 10))
+	}
+	if len(view.Items) == 0 {
+		lines = append(lines, "暂无符合条件的订单。")
+		return strings.Join(lines, "\n")
+	}
+	for _, item := range view.Items {
+		line := item.OrderNo + " | " + item.Status + " | qty=" + strconv.Itoa(item.Quantity)
+		if item.ProductID > 0 {
+			line += " | product_id=" + strconv.FormatUint(uint64(item.ProductID), 10)
+		}
+		if item.SKUID > 0 {
+			line += " | sku_id=" + strconv.FormatUint(uint64(item.SKUID), 10)
+		}
+		if strings.TrimSpace(item.PaidAt) != "" {
+			line += " | paid_at=" + strings.TrimSpace(item.PaidAt)
+		}
+		lines = append(lines, line)
 	}
 	return strings.Join(lines, "\n")
 }

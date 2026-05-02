@@ -83,6 +83,8 @@ func (w *FulfillmentWorkflow) BuildNotificationHint(ctx context.Context, session
 			hint.Email = NotificationTargetHint{Status: NotificationStatusUnknown, Reason: "smtp settings missing"}
 		} else if !smtp.Enabled {
 			hint.Email = NotificationTargetHint{Status: NotificationStatusExpectedSkip, Reason: "smtp disabled"}
+		} else if !smtp.OrderNotificationEnabled {
+			hint.Email = NotificationTargetHint{Status: NotificationStatusExpectedSkip, Reason: "order notification email disabled"}
 		} else if isPlaceholderEmail(receiverEmail) {
 			hint.Email = NotificationTargetHint{Status: NotificationStatusExpectedSkip, Reason: "telegram placeholder email"}
 		} else {

@@ -214,6 +214,80 @@ func TestBatchShipCommandRoutesFilterAndDelivery(t *testing.T) {
 	}
 }
 
+func TestBatchShipCommandParsesProductIDAndSKUID(t *testing.T) {
+	flow := &stubFulfillmentWorkflow{
+		batchPreview: &workflow.BatchFulfillmentPreviewView{
+			ActionKey:      "fulfillment_batch_confirm:1",
+			OrderCount:     2,
+			OrderNos:       []string{"DJ1001", "DJ1002"},
+			DeliveryKind:   "card_secrets",
+			PayloadPreview: "2 orders / 3 secrets",
+		},
+	}
+
+	router := NewRouter(&stubSessionService{
+		requireView: &session.SessionView{
+			TelegramUser: 123456789,
+			AdminID:      3,
+			Username:     "ops",
+			JWTToken:     "jwt-demo",
+		},
+	}).WithFulfillmentWorkflow(flow)
+
+	_, err := router.Handle(context.Background(), IncomingUpdate{
+		TelegramUser: 123456789,
+		ChatID:       123456789,
+		ChatType:     ChatTypePrivate,
+		Text:         "/batch_ship product_id=9 sku_id=3 limit=5\nCARD-1\nCARD-2\nCARD-3",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if flow.lastBatchFilter.ProductID != 9 || flow.lastBatchFilter.SKUID != 3 || flow.lastBatchFilter.Limit != 5 {
+		t.Fatalf("unexpected product batch filter: %#v", flow.lastBatchFilter)
+	}
+	if flow.lastBatchBody != "CARD-1\nCARD-2\nCARD-3" {
+		t.Fatalf("unexpected batch body: %q", flow.lastBatchBody)
+	}
+}
+
+func TestPendingShipCommandRoutesFilter(t *testing.T) {
+	flow := &stubFulfillmentWorkflow{
+		pendingList: &workflow.PendingFulfillmentListView{
+			OrderCount:    1,
+			TotalQuantity: 2,
+			Items: []workflow.PendingFulfillmentOrderView{
+				{OrderID: 11, OrderNo: "DJ1001", Status: "paid", ProductID: 9, SKUID: 3, Quantity: 2},
+			},
+		},
+	}
+
+	router := NewRouter(&stubSessionService{
+		requireView: &session.SessionView{
+			TelegramUser: 123456789,
+			AdminID:      3,
+			Username:     "ops",
+			JWTToken:     "jwt-demo",
+		},
+	}).WithFulfillmentWorkflow(flow)
+
+	result, err := router.Handle(context.Background(), IncomingUpdate{
+		TelegramUser: 123456789,
+		ChatID:       123456789,
+		ChatType:     ChatTypePrivate,
+		Text:         "/pending_ship product_id=9 sku_id=3 limit=5",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if flow.lastPendingFilter.ProductID != 9 || flow.lastPendingFilter.SKUID != 3 || flow.lastPendingFilter.Limit != 5 {
+		t.Fatalf("unexpected pending filter: %#v", flow.lastPendingFilter)
+	}
+	if !strings.Contains(result.Text, "待发货订单") || !strings.Contains(result.Text, "DJ1001") {
+		t.Fatalf("unexpected pending response: %#v", result)
+	}
+}
+
 func TestRestockCommandBuildsPreviewWithConfirmButton(t *testing.T) {
 	restock := &stubRestockWorkflow{
 		preview: &workflow.RestockPreviewView{
@@ -334,15 +408,17 @@ func (s *stubSalesWorkflow) BuildOverview(_ context.Context, _ *session.SessionV
 }
 
 type stubFulfillmentWorkflow struct {
-	lastOrderNo     string
-	lastDelivery    string
-	singlePreview   *workflow.SingleFulfillmentPreviewView
-	singleResult    *workflow.SingleFulfillmentResultView
-	lastBatchFilter workflow.BatchFulfillmentFilter
-	lastBatchBody   string
-	batchPreview    *workflow.BatchFulfillmentPreviewView
-	batchResult     *workflow.BatchFulfillmentResultView
-	err             error
+	lastOrderNo       string
+	lastDelivery      string
+	singlePreview     *workflow.SingleFulfillmentPreviewView
+	singleResult      *workflow.SingleFulfillmentResultView
+	lastBatchFilter   workflow.BatchFulfillmentFilter
+	lastBatchBody     string
+	batchPreview      *workflow.BatchFulfillmentPreviewView
+	batchResult       *workflow.BatchFulfillmentResultView
+	lastPendingFilter workflow.BatchFulfillmentFilter
+	pendingList       *workflow.PendingFulfillmentListView
+	err               error
 }
 
 func (s *stubFulfillmentWorkflow) BuildSinglePreview(_ context.Context, _ *session.SessionView, orderNo string, rawDelivery string) (*workflow.SingleFulfillmentPreviewView, error) {
@@ -363,6 +439,11 @@ func (s *stubFulfillmentWorkflow) BuildBatchPreview(_ context.Context, _ *sessio
 
 func (s *stubFulfillmentWorkflow) ConfirmBatch(_ context.Context, _ *session.SessionView, _ string) (*workflow.BatchFulfillmentResultView, error) {
 	return s.batchResult, s.err
+}
+
+func (s *stubFulfillmentWorkflow) BuildPendingList(_ context.Context, _ *session.SessionView, filter workflow.BatchFulfillmentFilter) (*workflow.PendingFulfillmentListView, error) {
+	s.lastPendingFilter = filter
+	return s.pendingList, s.err
 }
 
 type stubRestockWorkflow struct {

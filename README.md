@@ -11,7 +11,8 @@ Current implementation covers:
 - admin login, logout, and session lookup
 - daily, weekly, and monthly sales overview
 - auto-fulfillment restock preview and confirmation
-- single and batch manual fulfillment preview and confirmation
+- pending manual fulfillment lookup
+- single and batch manual fulfillment preview and confirmation, including same-product card assignment by paid order
 - customer notification hint computation for email and Telegram
 
 Important boundary:
@@ -133,8 +134,17 @@ Current command set:
 - `/help`
 - `/sales today|week|month`
 - `/restock <product_id> [sku_id]` followed by pasted secrets on the next lines
+- `/pending_ship [status=paid|fulfilling|pending] [product_id=<id>] [sku_id=<id>] [product=<keyword>] [from=<date>] [to=<date>] [limit=<n>]`
 - `/ship <order_no>` followed by fulfillment content on the next lines
-- `/batch_ship status=<status> [product=<keyword>] [from=<date>] [to=<date>] [limit=<n>]` followed by fulfillment content on the next lines
+- `/batch_ship [status=paid|fulfilling|pending] [product_id=<id>] [sku_id=<id>] [product=<keyword>] [from=<date>] [to=<date>] [limit=<n>]` followed by fulfillment content on the next lines
+
+Same-product batch fulfillment:
+
+- set `product_id`, and optionally `sku_id`, to restrict the order range
+- paste one card secret per line
+- the bot rejects mismatched card counts before confirmation
+- after confirmation, the bot allocates card secrets by paid order time and each order item quantity
+- fulfillment still calls Dujiao `POST /admin/fulfillments`, so Dujiao's email, Telegram, and callback flows remain the notification source
 
 Current upload support:
 

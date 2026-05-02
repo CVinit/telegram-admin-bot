@@ -20,6 +20,36 @@ func TestSalesTodayUsesDashboardOverviewRangeToday(t *testing.T) {
 	}
 }
 
+func TestSalesWeekUsesDashboardOverviewRange7d(t *testing.T) {
+	deps := newSalesTestDeps()
+
+	view, err := deps.Workflow.BuildOverview(context.Background(), deps.Session, "week")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if deps.API.LastQuery.Range != "7d" {
+		t.Fatalf("expected range=7d, got %s", deps.API.LastQuery.Range)
+	}
+	if view.Title != "本周销售" {
+		t.Fatalf("expected weekly title, got %q", view.Title)
+	}
+}
+
+func TestSalesMonthUsesDashboardOverviewRange30d(t *testing.T) {
+	deps := newSalesTestDeps()
+
+	view, err := deps.Workflow.BuildOverview(context.Background(), deps.Session, "month")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if deps.API.LastQuery.Range != "30d" {
+		t.Fatalf("expected range=30d, got %s", deps.API.LastQuery.Range)
+	}
+	if view.Title != "本月销售" {
+		t.Fatalf("expected monthly title, got %q", view.Title)
+	}
+}
+
 type salesTestDeps struct {
 	Workflow *SalesWorkflow
 	Session  *session.SessionView

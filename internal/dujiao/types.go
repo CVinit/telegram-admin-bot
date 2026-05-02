@@ -114,6 +114,7 @@ type OrderListItem struct {
 	UserEmail       string `json:"user_email"`
 	UserDisplayName string `json:"user_display_name"`
 	CreatedAt       string `json:"created_at"`
+	PaidAt          string `json:"paid_at"`
 }
 
 type OrderDetail struct {
@@ -126,6 +127,8 @@ type OrderDetail struct {
 	TotalAmount     string             `json:"total_amount"`
 	UserEmail       string             `json:"user_email"`
 	UserDisplayName string             `json:"user_display_name"`
+	CreatedAt       string             `json:"created_at"`
+	PaidAt          string             `json:"paid_at"`
 	CouponCode      string             `json:"coupon_code"`
 	PromotionName   string             `json:"promotion_name"`
 	Items           []OrderItem        `json:"items"`
@@ -268,17 +271,18 @@ type SMTPVerifyCodeSettings struct {
 }
 
 type SMTPSettings struct {
-	Enabled     bool                   `json:"enabled"`
-	Host        string                 `json:"host"`
-	Port        int                    `json:"port"`
-	Username    string                 `json:"username"`
-	Password    string                 `json:"password"`
-	HasPassword bool                   `json:"has_password"`
-	From        string                 `json:"from"`
-	FromName    string                 `json:"from_name"`
-	UseTLS      bool                   `json:"use_tls"`
-	UseSSL      bool                   `json:"use_ssl"`
-	VerifyCode  SMTPVerifyCodeSettings `json:"verify_code"`
+	Enabled                  bool                   `json:"enabled"`
+	OrderNotificationEnabled bool                   `json:"order_notification_enabled"`
+	Host                     string                 `json:"host"`
+	Port                     int                    `json:"port"`
+	Username                 string                 `json:"username"`
+	Password                 string                 `json:"password"`
+	HasPassword              bool                   `json:"has_password"`
+	From                     string                 `json:"from"`
+	FromName                 string                 `json:"from_name"`
+	UseTLS                   bool                   `json:"use_tls"`
+	UseSSL                   bool                   `json:"use_ssl"`
+	VerifyCode               SMTPVerifyCodeSettings `json:"verify_code"`
 }
 
 type TelegramBotRuntimeStatus struct {
