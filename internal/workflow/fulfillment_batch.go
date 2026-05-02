@@ -482,9 +482,9 @@ func normalizeBatchFulfillmentLimit(limit int) int {
 func fulfillmentStatuses(status string) []string {
 	switch strings.ToLower(strings.TrimSpace(status)) {
 	case "", "pending", "all":
-		return []string{"paid", "fulfilling", "delivering"}
-	case "delivering":
-		return []string{"delivering"}
+		return []string{"paid", "fulfilling"}
+	case "fulfilling":
+		return []string{"fulfilling"}
 	default:
 		return []string{strings.TrimSpace(status)}
 	}
