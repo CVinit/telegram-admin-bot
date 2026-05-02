@@ -446,6 +446,18 @@ func (s *stubFulfillmentWorkflow) BuildPendingList(_ context.Context, _ *session
 	return s.pendingList, s.err
 }
 
+func (s *stubFulfillmentWorkflow) ListProductsForFulfillment(_ context.Context, _ *session.SessionView, _ workflow.BatchFulfillmentFilter) (*workflow.ProductFulfillmentListView, error) {
+	return &workflow.ProductFulfillmentListView{Items: nil}, s.err
+}
+
+func (s *stubFulfillmentWorkflow) BuildProductShipPreview(_ context.Context, _ *session.SessionView, _ uint, _ uint, _ string) (*workflow.ProductShipPreviewView, error) {
+	return nil, s.err
+}
+
+func (s *stubFulfillmentWorkflow) ConfirmProductShip(_ context.Context, _ *session.SessionView, _ string) (*workflow.BatchFulfillmentResultView, error) {
+	return s.batchResult, s.err
+}
+
 type stubRestockWorkflow struct {
 	lastTextProductID uint
 	lastTextSKUID     uint

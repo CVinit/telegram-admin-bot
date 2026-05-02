@@ -18,7 +18,7 @@ const (
 	menuTextHelp       = "帮助"
 	menuTextLogout     = "退出登录"
 	menuHomeTitle      = "管理员菜单"
-	helpSummaryText    = "可用命令: /login /logout /session /help /sales today|week|month /restock /pending_ship /ship /batch_ship"
+	helpSummaryText    = "可用命令: /login /logout /session /help /sales today|week|month /restock /pending_ship /ship_by_product /ship /batch_ship"
 	notLoggedInSummary = "当前未登录，请先使用 /login <username> <password>。"
 )
 

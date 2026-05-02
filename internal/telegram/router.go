@@ -16,14 +16,24 @@ type sessionService interface {
 }
 
 type Router struct {
-	sessions    sessionService
-	sales       salesWorkflow
-	restock     restockWorkflow
-	fulfillment fulfillmentWorkflow
+	sessions           sessionService
+	sales              salesWorkflow
+	restock            restockWorkflow
+	fulfillment        fulfillmentWorkflow
+	pendingProductShip map[int64]pendingProductShipState
+}
+
+type pendingProductShipState struct {
+	ProductID   uint
+	SKUID       uint
+	ProductName string
 }
 
 func NewRouter(sessions sessionService) *Router {
-	return &Router{sessions: sessions}
+	return &Router{
+		sessions:           sessions,
+		pendingProductShip: make(map[int64]pendingProductShipState),
+	}
 }
 
 func (r *Router) Handle(ctx context.Context, update IncomingUpdate) (*Response, error) {
@@ -36,6 +46,14 @@ func (r *Router) Handle(ctx context.Context, update IncomingUpdate) (*Response, 
 
 	if strings.TrimSpace(update.CallbackData) != "" {
 		return r.handleCallback(ctx, update)
+	}
+
+	// Check if user is in pending product ship state (waiting for card secrets)
+	if r.fulfillment != nil && update.TelegramUser != 0 && strings.TrimSpace(update.Text) != "" {
+		if state, ok := r.pendingProductShip[update.TelegramUser]; ok {
+			delete(r.pendingProductShip, update.TelegramUser)
+			return r.handleProductShipWithSecrets(ctx, update, state)
+		}
 	}
 
 	command, args := parseCommand(update.Text)
@@ -65,6 +83,8 @@ func (r *Router) Handle(ctx context.Context, update IncomingUpdate) (*Response, 
 		return r.handlePendingShip(ctx, update, args)
 	case "/batch_ship":
 		return r.handleBatchShip(ctx, update, args)
+	case "/ship_by_product":
+		return r.handleShipByProduct(ctx, update, args)
 	default:
 		return &Response{Text: helpSummaryText}, nil
 	}
@@ -83,6 +103,12 @@ func (r *Router) handleCallback(ctx context.Context, update IncomingUpdate) (*Re
 		}
 		if strings.HasPrefix(strings.TrimSpace(update.CallbackData), workflow.FulfillmentConfirmPrefix) {
 			return r.handleFulfillmentConfirm(ctx, update)
+		}
+		if strings.HasPrefix(strings.TrimSpace(update.CallbackData), workflow.ProductShipConfirmPrefix) {
+			return r.handleProductShipConfirm(ctx, update)
+		}
+		if strings.HasPrefix(strings.TrimSpace(update.CallbackData), workflow.ProductListConfirmPrefix) {
+			return r.handleProductListSelect(ctx, update)
 		}
 		return &Response{
 			Text:         "未识别的菜单操作。",
@@ -121,7 +147,7 @@ func parseCommand(text string) (string, []string) {
 
 func isSensitiveCommand(command string) bool {
 	switch command {
-	case "/login", "/logout", "/session", "/sales", "/restock", "/ship", "/pending_ship", "/batch_ship":
+	case "/login", "/logout", "/session", "/sales", "/restock", "/ship", "/pending_ship", "/batch_ship", "/ship_by_product":
 		return true
 	default:
 		return false

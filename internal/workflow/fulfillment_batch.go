@@ -14,6 +14,8 @@ import (
 )
 
 const FulfillmentBatchConfirmPrefix = "fulfillment_batch_confirm"
+const ProductListConfirmPrefix = "product_list"
+const ProductShipConfirmPrefix = "product_ship"
 
 const defaultBatchFulfillmentLimit = 20
 
@@ -100,6 +102,38 @@ type manualFulfillmentCandidate struct {
 	Quantity  int
 	PaidAt    string
 	CreatedAt string
+}
+
+type ProductFulfillmentSummary struct {
+	ProductID   uint   `json:"product_id"`
+	SKUID       uint   `json:"sku_id,omitempty"`
+	ProductName string `json:"product_name"`
+	OrderCount  int    `json:"order_count"`
+	TotalQty    int    `json:"total_qty"`
+}
+
+type ProductFulfillmentListView struct {
+	Items []ProductFulfillmentSummary `json:"items"`
+}
+
+type productShipPayload struct {
+	ProductID     uint                       `json:"product_id"`
+	SKUID         uint                       `json:"sku_id,omitempty"`
+	ProductName   string                     `json:"product_name"`
+	Assignments   []batchFulfillmentAssignment `json:"assignments,omitempty"`
+}
+
+type ProductShipPreviewView struct {
+	ActionKey      string `json:"action_key"`
+	ExpiresAt      string `json:"expires_at"`
+	ProductID      uint   `json:"product_id"`
+	SKUID          uint   `json:"sku_id,omitempty"`
+	ProductName    string `json:"product_name"`
+	OrderCount     int    `json:"order_count"`
+	TotalQuantity  int    `json:"total_quantity"`
+	SecretCount    int    `json:"secret_count"`
+	OrderNos       []string `json:"order_nos"`
+	PayloadPreview string `json:"payload_preview"`
 }
 
 func (w *FulfillmentWorkflow) BuildPendingList(ctx context.Context, sessionView *session.SessionView, filter BatchFulfillmentFilter) (*PendingFulfillmentListView, error) {
@@ -597,4 +631,188 @@ func parseCardSecretLines(raw string) ([]string, error) {
 		return nil, errors.New("delivery content is required")
 	}
 	return secrets, nil
+}
+
+func (w *FulfillmentWorkflow) ListProductsForFulfillment(ctx context.Context, sessionView *session.SessionView, filter BatchFulfillmentFilter) (*ProductFulfillmentListView, error) {
+	if w == nil || w.api == nil {
+		return nil, errNilFulfillmentAPI
+	}
+	if sessionView == nil {
+		return nil, errSessionRequired
+	}
+
+	candidates, err := w.collectManualFulfillmentCandidates(ctx, sessionView, filter)
+	if err != nil {
+		return nil, err
+	}
+
+	productMap := make(map[uint]*ProductFulfillmentSummary)
+	for _, c := range candidates {
+		key := c.ProductID<<32 | c.SKUID
+		if _, ok := productMap[key]; !ok {
+			productName := fmt.Sprintf("Product %d", c.ProductID)
+			if c.ProductID > 0 {
+				if prod, err := w.api.GetProduct(ctx, strings.TrimSpace(sessionView.JWTToken), c.ProductID); err == nil && prod != nil {
+					if title, ok := prod.Title["zh-CN"].(string); ok && title != "" {
+						productName = title
+					} else if title, ok := prod.Title["en-US"].(string); ok && title != "" {
+						productName = title
+					}
+				}
+			}
+			productMap[key] = &ProductFulfillmentSummary{
+				ProductID:   c.ProductID,
+				SKUID:       c.SKUID,
+				ProductName: productName,
+			}
+		}
+		productMap[key].OrderCount++
+		productMap[key].TotalQty += c.Quantity
+	}
+
+	items := make([]ProductFulfillmentSummary, 0, len(productMap))
+	for _, p := range productMap {
+		items = append(items, *p)
+	}
+	sort.SliceStable(items, func(i, j int) bool {
+		return items[i].ProductID < items[j].ProductID
+	})
+	return &ProductFulfillmentListView{Items: items}, nil
+}
+
+func (w *FulfillmentWorkflow) BuildProductShipPreview(ctx context.Context, sessionView *session.SessionView, productID uint, skuID uint, rawDelivery string) (*ProductShipPreviewView, error) {
+	if w == nil || w.api == nil {
+		return nil, errNilFulfillmentAPI
+	}
+	if w.confirmations == nil {
+		return nil, errors.New("confirmation service is nil")
+	}
+	if sessionView == nil {
+		return nil, errSessionRequired
+	}
+
+	filter := BatchFulfillmentFilter{
+		ProductID: productID,
+		SKUID:     skuID,
+		Status:    "all",
+		Limit:     200,
+	}
+	candidates, err := w.collectManualFulfillmentCandidates(ctx, sessionView, filter)
+	if err != nil {
+		return nil, err
+	}
+	if len(candidates) == 0 {
+		return nil, fmt.Errorf("no eligible orders for product %d", productID)
+	}
+
+	secrets, err := parseCardSecretLines(rawDelivery)
+	if err != nil {
+		return nil, err
+	}
+	totalQty := totalCandidateQuantity(candidates)
+	if len(secrets) != totalQty {
+		return nil, fmt.Errorf("卡密数量错误: 需要 %d 个，已提供 %d 个", totalQty, len(secrets))
+	}
+
+	assignments := make([]batchFulfillmentAssignment, 0, len(candidates))
+	orderNos := make([]string, 0, len(candidates))
+	cursor := 0
+	for _, candidate := range candidates {
+		end := cursor + candidate.Quantity
+		assignedSecrets := append([]string(nil), secrets[cursor:end]...)
+		assignments = append(assignments, batchFulfillmentAssignment{
+			OrderID:  candidate.OrderID,
+			OrderNo:  candidate.OrderNo,
+			Quantity: candidate.Quantity,
+			Secrets:  assignedSecrets,
+			Payload:  strings.Join(assignedSecrets, "\n"),
+		})
+		orderNos = append(orderNos, candidate.OrderNo)
+		cursor = end
+	}
+
+	productName := fmt.Sprintf("Product %d", productID)
+	if productID > 0 {
+		if prod, err := w.api.GetProduct(ctx, strings.TrimSpace(sessionView.JWTToken), productID); err == nil && prod != nil {
+			if title, ok := prod.Title["zh-CN"].(string); ok && title != "" {
+				productName = title
+			} else if title, ok := prod.Title["en-US"].(string); ok && title != "" {
+				productName = title
+			}
+		}
+	}
+
+	payload := productShipPayload{
+		ProductID:   productID,
+		SKUID:       skuID,
+		ProductName: productName,
+		Assignments: assignments,
+	}
+	record, err := w.confirmations.Create(ctx, sessionView.TelegramUser, ProductShipConfirmPrefix, payload)
+	if err != nil {
+		return nil, err
+	}
+
+	return &ProductShipPreviewView{
+		ActionKey:      record.ActionKey,
+		ExpiresAt:      record.ExpiresAt.UTC().Format(timeRFC3339),
+		ProductID:      productID,
+		SKUID:          skuID,
+		ProductName:    productName,
+		OrderCount:     len(orderNos),
+		TotalQuantity:  totalQty,
+		SecretCount:    len(secrets),
+		OrderNos:       orderNos,
+		PayloadPreview: fmt.Sprintf("%d 订单 / %d 卡密", len(orderNos), len(secrets)),
+	}, nil
+}
+
+func (w *FulfillmentWorkflow) ConfirmProductShip(ctx context.Context, sessionView *session.SessionView, actionKey string) (*BatchFulfillmentResultView, error) {
+	if w == nil || w.api == nil {
+		return nil, errNilFulfillmentAPI
+	}
+	if w.confirmations == nil {
+		return nil, errors.New("confirmation service is nil")
+	}
+	if sessionView == nil {
+		return nil, errSessionRequired
+	}
+
+	var payload productShipPayload
+	action, err := w.confirmations.Consume(ctx, sessionView.TelegramUser, actionKey, &payload)
+	if err != nil {
+		return nil, err
+	}
+
+	result := &BatchFulfillmentResultView{
+		TotalCount: len(payload.Assignments),
+		Items:      make([]BatchFulfillmentItemResult, 0, len(payload.Assignments)),
+	}
+	for _, assignment := range payload.Assignments {
+		item := BatchFulfillmentItemResult{
+			OrderID: assignment.OrderID,
+			OrderNo: assignment.OrderNo,
+		}
+		_, err := w.api.CreateFulfillment(ctx, strings.TrimSpace(sessionView.JWTToken), dujiao.CreateFulfillmentRequest{
+			OrderID: assignment.OrderID,
+			Payload: assignment.Payload,
+		})
+		if err != nil {
+			item.Status = "failed"
+			item.Error = err.Error()
+			result.FailedCount++
+		} else {
+			item.Status = "delivered"
+			result.SuccessCount++
+		}
+		result.Items = append(result.Items, item)
+	}
+
+	if w.audit != nil {
+		_ = w.audit.LogActionSucceeded(ctx, sessionView.TelegramUser, sessionView.AdminID, "product_ship_confirm",
+			fmt.Sprintf("product:%d", payload.ProductID),
+			fmt.Sprintf("success=%d failed=%d", result.SuccessCount, result.FailedCount),
+			map[string]any{"action_key": action.Action, "product_id": payload.ProductID})
+	}
+	return result, nil
 }

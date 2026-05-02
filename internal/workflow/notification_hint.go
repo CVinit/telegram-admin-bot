@@ -28,6 +28,7 @@ type fulfillmentAPI interface {
 	ListOrders(ctx context.Context, token string, params dujiao.ListOrdersParams) (*dujiao.OrderListResponse, error)
 	GetOrder(ctx context.Context, token string, id uint) (*dujiao.OrderDetail, error)
 	CreateFulfillment(ctx context.Context, token string, req dujiao.CreateFulfillmentRequest) (*dujiao.FulfillmentResponse, error)
+	GetProduct(ctx context.Context, token string, id uint) (*dujiao.ProductDetail, error)
 	GetUser(ctx context.Context, token string, id uint) (*dujiao.AdminUserDetail, error)
 	GetSMTPSettings(ctx context.Context, token string) (*dujiao.SMTPSettings, error)
 	GetTelegramBotRuntimeStatus(ctx context.Context, token string) (*dujiao.TelegramBotRuntimeStatus, error)

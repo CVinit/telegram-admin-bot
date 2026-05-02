@@ -1,6 +1,7 @@
 package render
 
 import (
+	"fmt"
 	"strconv"
 	"strings"
 
@@ -138,4 +139,38 @@ func renderHintReason(reason string) string {
 		return ""
 	}
 	return " [" + reason + "]"
+}
+
+func RenderProductFulfillmentList(view *workflow.ProductFulfillmentListView) string {
+	if view == nil || len(view.Items) == 0 {
+		return "暂无待发货商品。"
+	}
+	lines := []string{"待发货商品清单", ""}
+	for _, item := range view.Items {
+		line := fmt.Sprintf("%s\n  订单数: %d | 总数量: %d | product_id=%d",
+			item.ProductName, item.OrderCount, item.TotalQty, item.ProductID)
+		if item.SKUID > 0 {
+			line += fmt.Sprintf(" | sku_id=%d", item.SKUID)
+		}
+		lines = append(lines, line)
+	}
+	return strings.Join(lines, "\n")
+}
+
+func RenderProductShipPreview(view *workflow.ProductShipPreviewView) string {
+	if view == nil {
+		return "发货预览不可用。"
+	}
+	lines := []string{
+		"商品发货预览",
+		"商品: " + view.ProductName,
+		fmt.Sprintf("订单数: %d", view.OrderCount),
+		fmt.Sprintf("总数量: %d", view.TotalQuantity),
+		fmt.Sprintf("卡密数: %d", view.SecretCount),
+	}
+	if len(view.OrderNos) > 0 {
+		lines = append(lines, "订单: "+strings.Join(view.OrderNos, ", "))
+	}
+	lines = append(lines, "", view.PayloadPreview)
+	return strings.Join(lines, "\n")
 }

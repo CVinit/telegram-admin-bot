@@ -371,3 +371,7 @@ func (s *stubFulfillmentAPI) GetTelegramBotRuntimeStatus(context.Context, string
 func (s *stubFulfillmentAPI) ListChannelClients(context.Context, string) ([]dujiao.ChannelClient, error) {
 	return s.channelClients, nil
 }
+
+func (s *stubFulfillmentAPI) GetProduct(context.Context, string, uint) (*dujiao.ProductDetail, error) {
+	return nil, nil
+}
