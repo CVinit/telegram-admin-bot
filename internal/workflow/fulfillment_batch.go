@@ -390,23 +390,11 @@ func (w *FulfillmentWorkflow) collectManualFulfillmentCandidates(ctx context.Con
 			if err != nil || order == nil {
 				continue
 			}
-			if err := validateManualFulfillmentOrder(order); err != nil {
-				continue
+
+			processErr := w.processOrderForFulfillment(ctx, token, order, item, filter, seen, &candidates)
+			if processErr != nil {
+				return nil, processErr
 			}
-			candidate, ok, err := manualCandidateForOrder(order, filter)
-			if err != nil {
-				return nil, err
-			}
-			if !ok {
-				continue
-			}
-			if candidate.PaidAt == "" {
-				candidate.PaidAt = strings.TrimSpace(item.PaidAt)
-			}
-			if candidate.CreatedAt == "" {
-				candidate.CreatedAt = strings.TrimSpace(item.CreatedAt)
-			}
-			candidates = append(candidates, candidate)
 		}
 	}
 
@@ -452,6 +440,59 @@ func manualCandidateForOrder(order *dujiao.OrderDetail, filter BatchFulfillmentF
 		return manualFulfillmentCandidate{}, false, nil
 	}
 	return candidate, true, nil
+}
+
+func (w *FulfillmentWorkflow) processOrderForFulfillment(ctx context.Context, token string, order *dujiao.OrderDetail, item dujiao.OrderListItem, filter BatchFulfillmentFilter, seen map[uint]struct{}, candidates *[]manualFulfillmentCandidate) error {
+	if len(order.Children) > 0 {
+		for _, child := range order.Children {
+			if _, ok := seen[child.ID]; ok {
+				continue
+			}
+			seen[child.ID] = struct{}{}
+
+			childOrder, err := w.api.GetOrder(ctx, token, child.ID)
+			if err != nil || childOrder == nil {
+				continue
+			}
+			if err := validateManualFulfillmentOrder(childOrder); err != nil {
+				continue
+			}
+			candidate, ok, err := manualCandidateForOrder(childOrder, filter)
+			if err != nil {
+				return err
+			}
+			if !ok {
+				continue
+			}
+			if candidate.PaidAt == "" {
+				candidate.PaidAt = strings.TrimSpace(item.PaidAt)
+			}
+			if candidate.CreatedAt == "" {
+				candidate.CreatedAt = strings.TrimSpace(item.CreatedAt)
+			}
+			*candidates = append(*candidates, candidate)
+		}
+		return nil
+	}
+
+	if err := validateManualFulfillmentOrder(order); err != nil {
+		return nil
+	}
+	candidate, ok, err := manualCandidateForOrder(order, filter)
+	if err != nil {
+		return err
+	}
+	if !ok {
+		return nil
+	}
+	if candidate.PaidAt == "" {
+		candidate.PaidAt = strings.TrimSpace(item.PaidAt)
+	}
+	if candidate.CreatedAt == "" {
+		candidate.CreatedAt = strings.TrimSpace(item.CreatedAt)
+	}
+	*candidates = append(*candidates, candidate)
+	return nil
 }
 
 func candidateIDsAndNos(candidates []manualFulfillmentCandidate) ([]uint, []string) {
